@@ -270,16 +270,17 @@ export function registerTools(server: McpServer, ctx: ToolContext) {
     "get_customer_statement",
     {
       title: "Get customer statement",
-      description: "Statement of account for one customer between two dates (opening balance, invoices, payments, closing balance).",
+      description:
+        "Invoices and payments for one customer between two dates. Customers are matched by their exact name as shown on invoices (use list_customers to find it).",
       inputSchema: {
-        customer_id: z.string().uuid(),
+        customer_name: z.string().trim().min(1).describe("Customer name exactly as on their invoices."),
         from: z.string().date().describe("Start date, YYYY-MM-DD."),
         to: z.string().date().describe("End date, YYYY-MM-DD."),
       },
       annotations: READ_ONLY,
     },
-    async ({ customer_id, from, to }) => {
-      const { data, error } = await anyDb(ctx).rpc("customer_statement", { _customer: customer_id, _from: from, _to: to });
+    async ({ customer_name, from, to }) => {
+      const { data, error } = await anyDb(ctx).rpc("customer_statement", { _customer: customer_name, _from: from, _to: to });
       return error ? fail(error.message) : ok("statement", data);
     },
   );

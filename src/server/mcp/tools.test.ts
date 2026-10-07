@@ -70,13 +70,13 @@ describe("Port Pal MCP tools", () => {
     await client.callTool({ name: "get_cashflow_forecast", arguments: { weeks: 8 } });
     await client.callTool({
       name: "get_customer_statement",
-      arguments: { customer_id: "00000000-0000-4000-8000-000000000001", from: "2026-01-01", to: "2026-06-30" },
+      arguments: { customer_name: "Acme Shipping Ltd", from: "2026-01-01", to: "2026-06-30" },
     });
     const rpcs = calls.filter((c) => c.op === "rpc").map((c) => c.args);
     expect(rpcs).toContainEqual(["cashflow_forecast", { _weeks: 8 }]);
     expect(rpcs).toContainEqual([
       "customer_statement",
-      { _customer: "00000000-0000-4000-8000-000000000001", _from: "2026-01-01", _to: "2026-06-30" },
+      { _customer: "Acme Shipping Ltd", _from: "2026-01-01", _to: "2026-06-30" },
     ]);
   });
 
