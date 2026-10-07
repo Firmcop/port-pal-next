@@ -28,17 +28,31 @@ function bucketize(dueDate: string | null | undefined): Bucket {
   return "d90plus";
 }
 
-function aggregate(rows: any[], nameField: string, amountField: string, dateField: string) {
-  const m: Record<string, Record<Bucket, number> & { name: string; total: number }> = {};
-  for (const r of rows) {
-    const name = r[nameField] || "Unknown";
-    if (!m[name]) m[name] = { name, total: 0, current: 0, d30: 0, d60: 0, d90: 0, d90plus: 0 };
-    const b = bucketize(r[dateField]);
-    const amt = Number(r[amountField] || 0);
-    m[name][b] += amt;
-    m[name].total += amt;
+type Row = Record<Bucket, number> & { name: string; currency: string; total: number };
+
+/** Groups open documents by party and currency, bucketed by days past due. */
+function aggregate(docs: { name: string; currency: string; amount: number; due: string | null }[]): Row[] {
+  const m: Record<string, Row> = {};
+  for (const d of docs) {
+    if (!(d.amount > 0.005)) continue;
+    const key = `${d.name}\u0000${d.currency}`;
+    if (!m[key]) m[key] = { name: d.name, currency: d.currency, total: 0, current: 0, d30: 0, d60: 0, d90: 0, d90plus: 0 };
+    const b = bucketize(d.due);
+    m[key][b] += d.amount;
+    m[key].total += d.amount;
   }
-  return Object.values(m).sort((a, b) => b.total - a.total);
+  return Object.values(m).sort((a, b) => a.currency.localeCompare(b.currency) || b.total - a.total);
+}
+
+/** One totals row per currency — amounts in different currencies are never added together. */
+function totalsByCurrency(rows: Row[]): Row[] {
+  const t: Record<string, Row> = {};
+  for (const r of rows) {
+    if (!t[r.currency]) t[r.currency] = { name: "Totals", currency: r.currency, total: 0, current: 0, d30: 0, d60: 0, d90: 0, d90plus: 0 };
+    BUCKETS.forEach((b) => (t[r.currency][b.key] += r[b.key]));
+    t[r.currency].total += r.total;
+  }
+  return Object.values(t);
 }
 
 export default function Aging() {
@@ -49,49 +63,50 @@ export default function Aging() {
     { table: "vendor_payments", queryKeys: ["ap-aging-data"] },
   ], "aging-rt");
   const { data: ar } = useQuery({
-
     queryKey: ["ar-aging-data"],
     queryFn: async () => {
+      // Open = sent/overdue and not voided; outstanding = total less payments received.
       const { data, error } = await supabase
         .from("invoices")
-        .select("customer_name, total_amount, due_at, status, currency")
-        .in("status", ["sent", "overdue", "issued"] as any)
+        .select("customer_name, customers:customer_id(company_name), total_amount, due_at, issued_at, currency, payments(amount)")
+        .in("status", ["sent", "overdue"])
         .is("voided_at", null)
-        .eq("partially_paid", false)
-        .limit(2000);
+        .limit(5000);
       if (error) throw error;
-      return data as any[];
+      return (data as any[]).map((r) => ({
+        name: r.customers?.company_name || r.customer_name || "Unknown",
+        currency: r.currency || "",
+        amount: Number(r.total_amount || 0) - (r.payments ?? []).reduce((s: number, p: any) => s + Number(p.amount || 0), 0),
+        due: r.due_at || r.issued_at,
+      }));
     },
   });
 
   const { data: ap } = useQuery({
     queryKey: ["ap-aging-data"],
     queryFn: async () => {
+      // Supplier bills (including the PO bills raised automatically) that are not fully paid.
       const { data, error } = await supabase
-        .from("purchase_orders" as any)
-        .select("supplier_name, total_cost, expected_delivery_date, status, created_at")
-        .in("status", ["approved", "received", "partially_received"])
-        .limit(2000);
+        .from("supplier_invoices")
+        .select("total_amount, paid_amount, due_date, issue_date, currency, suppliers:supplier_id(name)")
+        .in("status", ["issued", "partially_paid"])
+        .limit(5000);
       if (error) throw error;
-      return (data as any[]).map((r) => ({ ...r, due_date: r.expected_delivery_date || r.created_at }));
+      return (data as any[]).map((r) => ({
+        name: r.suppliers?.name || "Unknown supplier",
+        currency: r.currency || "",
+        amount: Number(r.total_amount || 0) - Number(r.paid_amount || 0),
+        due: r.due_date || r.issue_date,
+      }));
     },
   });
 
-  const arRows = useMemo(() => aggregate(ar ?? [], "customer_name", "total_amount", "due_at"), [ar]);
-  const apRows = useMemo(() => aggregate(ap ?? [], "supplier_name", "total_cost", "due_date"), [ap]);
+  const arRows = useMemo(() => aggregate(ar ?? []), [ar]);
+  const apRows = useMemo(() => aggregate(ap ?? []), [ap]);
+  const arTotals = useMemo(() => totalsByCurrency(arRows), [arRows]);
+  const apTotals = useMemo(() => totalsByCurrency(apRows), [apRows]);
 
-  const arTotals = arRows.reduce((acc, r) => {
-    BUCKETS.forEach((b) => (acc[b.key] += r[b.key]));
-    acc.total += r.total;
-    return acc;
-  }, { total: 0, current: 0, d30: 0, d60: 0, d90: 0, d90plus: 0 } as any);
-  const apTotals = apRows.reduce((acc, r) => {
-    BUCKETS.forEach((b) => (acc[b.key] += r[b.key]));
-    acc.total += r.total;
-    return acc;
-  }, { total: 0, current: 0, d30: 0, d60: 0, d90: 0, d90plus: 0 } as any);
-
-  const renderTable = (rows: any[], totals: any, label: string) => (
+  const renderTable = (rows: Row[], totals: Row[], label: string) => (
     <Card>
       <CardHeader className="py-3"><CardTitle className="text-base">{label}</CardTitle></CardHeader>
       <CardContent className="p-0">
@@ -107,19 +122,19 @@ export default function Aging() {
             {!rows.length ? (
               <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nothing outstanding.</TableCell></TableRow>
             ) : rows.map((r) => (
-              <TableRow key={r.name}>
-                <TableCell>{r.name}</TableCell>
-                {BUCKETS.map((b) => <TableCell key={b.key} className="text-right font-mono">{r[b.key] ? fmtMoney(r[b.key]) : "—"}</TableCell>)}
-                <TableCell className="text-right font-mono font-semibold">{fmtMoney(r.total)}</TableCell>
+              <TableRow key={`${r.name}-${r.currency}`}>
+                <TableCell>{r.name} <span className="text-xs text-muted-foreground">{r.currency}</span></TableCell>
+                {BUCKETS.map((b) => <TableCell key={b.key} className="text-right font-mono">{r[b.key] ? fmtMoney(r[b.key], r.currency) : "—"}</TableCell>)}
+                <TableCell className="text-right font-mono font-semibold">{fmtMoney(r.total, r.currency)}</TableCell>
               </TableRow>
             ))}
-            {rows.length ? (
-              <TableRow className="font-bold border-t-2">
-                <TableCell>Totals</TableCell>
-                {BUCKETS.map((b) => <TableCell key={b.key} className="text-right font-mono">{fmtMoney(totals[b.key])}</TableCell>)}
-                <TableCell className="text-right font-mono">{fmtMoney(totals.total)}</TableCell>
+            {totals.map((t) => (
+              <TableRow key={`totals-${t.currency}`} className="font-bold border-t-2">
+                <TableCell>Totals {t.currency}</TableCell>
+                {BUCKETS.map((b) => <TableCell key={b.key} className="text-right font-mono">{fmtMoney(t[b.key], t.currency)}</TableCell>)}
+                <TableCell className="text-right font-mono">{fmtMoney(t.total, t.currency)}</TableCell>
               </TableRow>
-            ) : null}
+            ))}
           </TableBody>
         </Table>
       </CardContent>
