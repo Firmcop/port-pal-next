@@ -88,7 +88,7 @@ RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
 AS $function$
 DECLARE
-  t record; _base text; _from_cur text; _to_cur text; _on date;
+  t record; _base text; _from_cur text; _to_cur text; _on date; _rf numeric; _rt numeric;
 BEGIN
   SELECT * INTO t FROM public.inter_account_transfers WHERE id = _id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Transfer not found'; END IF;
@@ -101,6 +101,15 @@ BEGIN
   SELECT upper(COALESCE(currency, _base)) INTO _from_cur FROM financial_accounts WHERE id = t.from_account_id;
   SELECT upper(COALESCE(currency, _base)) INTO _to_cur FROM financial_accounts WHERE id = t.to_account_id;
 
+  -- Base-currency rates for each leg. The inbound leg is valued at what left
+  -- the source account, so the transfer always balances in base currency.
+  _rf := CASE WHEN _from_cur = upper(_base) THEN 1
+              ELSE COALESCE(public.get_fx_rate(t.organization_id, _from_cur, _base, _on),
+                            CASE WHEN _to_cur = upper(_base) THEN NULLIF(t.fx_rate, 0) END) END;
+  _rt := CASE WHEN _to_cur = upper(_base) THEN 1
+              WHEN _rf IS NOT NULL AND COALESCE(t.fx_rate, 0) > 0 THEN _rf / t.fx_rate
+              ELSE public.get_fx_rate(t.organization_id, _to_cur, _base, _on) END;
+
   -- Money out of the source account: amount + fee, in the source currency.
   INSERT INTO public.accounting_transactions
     (transaction_number, transaction_date, account_type, category, description, debit_amount, credit_amount,
@@ -108,7 +117,7 @@ BEGIN
   VALUES ('TRF-OUT-' || substr(_id::text, 1, 8), t.transfer_date, 'asset', 'cash',
      COALESCE(NULLIF(t.description, ''), 'Transfer ' || t.transfer_number) || ' (out)',
      0, t.amount + COALESCE(t.fees, 0), 'inter_account_transfer', _id, t.organization_id, t.from_account_id,
-     _from_cur, public.get_fx_rate(t.organization_id, _from_cur, _base, _on), _base);
+     _from_cur, _rf, _base);
   -- Money into the destination account, converted at the transfer rate.
   INSERT INTO public.accounting_transactions
     (transaction_number, transaction_date, account_type, category, description, debit_amount, credit_amount,
@@ -116,7 +125,7 @@ BEGIN
   VALUES ('TRF-IN-' || substr(_id::text, 1, 8), t.transfer_date, 'asset', 'cash',
      COALESCE(NULLIF(t.description, ''), 'Transfer ' || t.transfer_number) || ' (in)',
      round(t.amount * t.fx_rate, 2), 0, 'inter_account_transfer', _id, t.organization_id, t.to_account_id,
-     _to_cur, public.get_fx_rate(t.organization_id, _to_cur, _base, _on), _base);
+     _to_cur, _rt, _base);
   -- The fee is an expense; it is NOT tagged to the bank account (that cancelled it out of the balance).
   IF COALESCE(t.fees, 0) > 0 THEN
     INSERT INTO public.accounting_transactions
@@ -124,7 +133,7 @@ BEGIN
        reference_type, reference_id, organization_id, currency, fx_rate, base_currency)
     VALUES ('TRF-FEE-' || substr(_id::text, 1, 8), t.transfer_date, 'expense', 'bank_charges',
        'Bank fee for transfer ' || t.transfer_number, t.fees, 0, 'inter_account_transfer', _id, t.organization_id,
-       _from_cur, public.get_fx_rate(t.organization_id, _from_cur, _base, _on), _base);
+       _from_cur, _rf, _base);
   END IF;
 END $function$;
 

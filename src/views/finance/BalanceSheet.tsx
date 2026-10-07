@@ -1,23 +1,16 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wallet } from "lucide-react";
 import { fmtMoney } from "@/lib/finance-format";
-import { useRealtimeInvalidate } from "@/hooks/use-realtime-invalidate";
 import { FinanceDataStatus } from "@/components/finance/FinanceDataStatus";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useGlBalances, todayISO } from "@/components/finance/useGlBalances";
 
 export default function BalanceSheet() {
-  useRealtimeInvalidate([{ table: "accounting_transactions", queryKeys: ["account-balances"] }], "bs-rt");
-  const { data: rows } = useQuery({
-
-    queryKey: ["account-balances"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("v_account_balances" as any).select("*").order("code");
-      if (error) throw error;
-      return data as any[];
-    },
-  });
+  const [asOf, setAsOf] = useState(todayISO());
+  const { data: rows } = useGlBalances(null, asOf || null, "bs-rt");
+  const currency = rows?.[0]?.currency;
 
   const data = useMemo(() => {
     const r = rows ?? [];
@@ -39,7 +32,7 @@ export default function BalanceSheet() {
   const Row = ({ r }: { r: any }) => (
     <div className="flex justify-between py-1 text-sm">
       <span><span className="font-mono text-xs text-muted-foreground mr-2">{r.code}</span>{r.name}</span>
-      <span className="font-mono">{fmtMoney(r.balance)}</span>
+      <span className="font-mono">{fmtMoney(r.balance, currency)}</span>
     </div>
   );
 
@@ -47,16 +40,17 @@ export default function BalanceSheet() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><Wallet className="h-6 w-6" />Balance Sheet</h1>
-        <p className="text-muted-foreground">Assets = Liabilities + Equity (incl. current year earnings).</p>
+        <p className="text-muted-foreground">Assets = Liabilities + Equity (incl. earnings not yet closed to retained earnings), in {currency ?? "base currency"}.</p>
       </div>
-      <FinanceDataStatus queryKeys={["account-balances"]} />
+      <div className="space-y-1"><Label htmlFor="bs-asof">As at</Label><Input id="bs-asof" type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} className="w-40" /></div>
+      <FinanceDataStatus queryKeys={["gl-balances"]} />
 
       <div className="grid md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="py-3"><CardTitle className="text-base">Assets</CardTitle></CardHeader>
           <CardContent>
             {data.assets.map((r) => <Row key={r.gl_account_id} r={r} />)}
-            <div className="flex justify-between py-2 border-t mt-2 font-bold"><span>Total Assets</span><span className="font-mono">{fmtMoney(data.totAssets)}</span></div>
+            <div className="flex justify-between py-2 border-t mt-2 font-bold"><span>Total Assets</span><span className="font-mono">{fmtMoney(data.totAssets, currency)}</span></div>
           </CardContent>
         </Card>
 
@@ -65,7 +59,7 @@ export default function BalanceSheet() {
             <CardHeader className="py-3"><CardTitle className="text-base">Liabilities</CardTitle></CardHeader>
             <CardContent>
               {data.liabilities.map((r) => <Row key={r.gl_account_id} r={r} />)}
-              <div className="flex justify-between py-2 border-t mt-2 font-semibold"><span>Total Liabilities</span><span className="font-mono">{fmtMoney(data.totLiab)}</span></div>
+              <div className="flex justify-between py-2 border-t mt-2 font-semibold"><span>Total Liabilities</span><span className="font-mono">{fmtMoney(data.totLiab, currency)}</span></div>
             </CardContent>
           </Card>
 
@@ -73,15 +67,15 @@ export default function BalanceSheet() {
             <CardHeader className="py-3"><CardTitle className="text-base">Equity</CardTitle></CardHeader>
             <CardContent>
               {data.equity.map((r) => <Row key={r.gl_account_id} r={r} />)}
-              <div className="flex justify-between py-1 text-sm italic"><span>Current Year Net Income</span><span className="font-mono">{fmtMoney(data.netIncome)}</span></div>
-              <div className="flex justify-between py-2 border-t mt-2 font-semibold"><span>Total Equity</span><span className="font-mono">{fmtMoney(data.totEquity)}</span></div>
+              <div className="flex justify-between py-1 text-sm italic"><span>Unclosed Earnings</span><span className="font-mono">{fmtMoney(data.netIncome, currency)}</span></div>
+              <div className="flex justify-between py-2 border-t mt-2 font-semibold"><span>Total Equity</span><span className="font-mono">{fmtMoney(data.totEquity, currency)}</span></div>
             </CardContent>
           </Card>
 
           <Card className={Math.abs(data.totAssets - (data.totLiab + data.totEquity)) < 0.01 ? "bg-success/10" : "bg-destructive/10"}>
             <CardContent className="py-3 flex justify-between font-bold">
               <span>Liabilities + Equity</span>
-              <span className="font-mono">{fmtMoney(data.totLiab + data.totEquity)}</span>
+              <span className="font-mono">{fmtMoney(data.totLiab + data.totEquity, currency)}</span>
             </CardContent>
           </Card>
         </div>

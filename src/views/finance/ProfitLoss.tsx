@@ -9,30 +9,34 @@ import { TrendingUp, FileDown, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { fmtMoney } from "@/lib/finance-format";
 import { exportCSV } from "@/lib/export-utils";
-import { useRealtimeInvalidate } from "@/hooks/use-realtime-invalidate";
 import { FinanceDataStatus } from "@/components/finance/FinanceDataStatus";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useGlBalances, startOfYearISO, todayISO } from "@/components/finance/useGlBalances";
+
+const nextDay = (iso: string) => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
 
 export default function ProfitLoss() {
-  useRealtimeInvalidate([{ table: "accounting_transactions", queryKeys: ["account-balances"] }], "pl-rt");
   const [drill, setDrill] = useState<{ id: string; label: string } | null>(null);
-
-  const { data: rows } = useQuery({
-    queryKey: ["account-balances"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("v_account_balances" as any).select("*").order("code");
-      if (error) throw error;
-      return data as any[];
-    },
-  });
+  const [from, setFrom] = useState(startOfYearISO());
+  const [to, setTo] = useState(todayISO());
+  const { data: rows } = useGlBalances(from || null, to || null, "pl-rt");
+  const currency = rows?.[0]?.currency;
 
   const { data: journalLines, isLoading: drillLoading } = useQuery({
-    queryKey: ["pl-drilldown", drill?.id],
+    queryKey: ["pl-drilldown", drill?.id, from, to],
     enabled: !!drill?.id,
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("v_expense_journal_lines")
         .select("*")
         .eq("gl_account_id", drill!.id)
+        .gte("transaction_date", from)
+        .lt("transaction_date", nextDay(to))
         .order("transaction_date", { ascending: false })
         .limit(500);
       if (error) throw error;
@@ -65,7 +69,7 @@ export default function ProfitLoss() {
         <span className="font-mono text-xs text-muted-foreground mr-1">{r.code}</span>{r.name}
         {drillable && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
       </span>
-      <span className="font-mono">{fmtMoney(r.balance)}</span>
+      <span className="font-mono">{fmtMoney(r.balance, currency)}</span>
     </button>
   );
 
@@ -75,15 +79,19 @@ export default function ProfitLoss() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><TrendingUp className="h-6 w-6" />Profit &amp; Loss</h1>
-        <p className="text-muted-foreground">All-time income statement. Click any cost line to see the journal entries behind it. <a href="/finance/reports/project-pnl" className="text-primary underline">View by project</a></p>
+        <p className="text-muted-foreground">Income statement for the period, in {currency ?? "base currency"}. Click any cost line to see the journal entries behind it. <a href="/finance/reports/project-pnl" className="text-primary underline">View by project</a></p>
       </div>
-      <FinanceDataStatus queryKeys={["account-balances"]} />
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1"><Label htmlFor="pl-from">From</Label><Input id="pl-from" type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} className="w-40" /></div>
+        <div className="space-y-1"><Label htmlFor="pl-to">To</Label><Input id="pl-to" type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} className="w-40" /></div>
+      </div>
+      <FinanceDataStatus queryKeys={["gl-balances"]} />
 
       <Card>
         <CardHeader className="py-3"><CardTitle className="text-base">Revenue</CardTitle></CardHeader>
         <CardContent>
           {sections.revenue.map((r) => <Row key={r.gl_account_id} r={r} />)}
-          <div className="flex justify-between py-2 border-t mt-2 font-semibold"><span>Total Revenue</span><span className="font-mono">{fmtMoney(sections.totRev)}</span></div>
+          <div className="flex justify-between py-2 border-t mt-2 font-semibold"><span>Total Revenue</span><span className="font-mono">{fmtMoney(sections.totRev, currency)}</span></div>
         </CardContent>
       </Card>
 
@@ -91,8 +99,8 @@ export default function ProfitLoss() {
         <CardHeader className="py-3"><CardTitle className="text-base">Cost of Goods Sold</CardTitle></CardHeader>
         <CardContent>
           {sections.cogs.map((r) => <Row key={r.gl_account_id} r={r} drillable />)}
-          <div className="flex justify-between py-2 border-t mt-2 font-semibold"><span>Total COGS</span><span className="font-mono">{fmtMoney(sections.totCogs)}</span></div>
-          <div className="flex justify-between py-2 border-t mt-2 font-semibold"><span>Gross Profit</span><span className="font-mono">{fmtMoney(sections.grossProfit)}</span></div>
+          <div className="flex justify-between py-2 border-t mt-2 font-semibold"><span>Total COGS</span><span className="font-mono">{fmtMoney(sections.totCogs, currency)}</span></div>
+          <div className="flex justify-between py-2 border-t mt-2 font-semibold"><span>Gross Profit</span><span className="font-mono">{fmtMoney(sections.grossProfit, currency)}</span></div>
         </CardContent>
       </Card>
 
@@ -100,13 +108,13 @@ export default function ProfitLoss() {
         <CardHeader className="py-3"><CardTitle className="text-base">Operating Expenses</CardTitle></CardHeader>
         <CardContent>
           {sections.expense.map((r) => <Row key={r.gl_account_id} r={r} drillable />)}
-          <div className="flex justify-between py-2 border-t mt-2 font-semibold"><span>Total Expenses</span><span className="font-mono">{fmtMoney(sections.totExp)}</span></div>
+          <div className="flex justify-between py-2 border-t mt-2 font-semibold"><span>Total Expenses</span><span className="font-mono">{fmtMoney(sections.totExp, currency)}</span></div>
         </CardContent>
       </Card>
 
       <Card>
         <CardContent className="flex justify-between py-4 text-lg font-bold">
-          <span>Net Income</span><span className="font-mono">{fmtMoney(sections.netIncome)}</span>
+          <span>Net Income</span><span className="font-mono">{fmtMoney(sections.netIncome, currency)}</span>
         </CardContent>
       </Card>
 
