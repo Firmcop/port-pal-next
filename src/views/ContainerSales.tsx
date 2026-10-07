@@ -210,24 +210,8 @@ export default function ContainerSales() {
       // 4. Accounting: cost of sale only. Stock is relieved automatically by the
       //    ledger contra rule, and the sale income is carried by the customer
       //    invoice so it is never counted twice.
-      const txnBase = Date.now().toString(36).toUpperCase();
-      const cogsAmount = Number(sale.entry_price || 0) + Number((sale as any).transport_offloading_cost || 0);
-      await supabase.from("accounting_transactions").insert([
-        {
-          transaction_number: `TXN-COGS-${txnBase}`,
-          account_type: "expense" as any,
-          category: "container_sale_cogs",
-          description: `COGS — acquisition of ${sale.containers?.container_number ?? ""} from ${originalOwner}`,
-          debit_amount: cogsAmount,
-          credit_amount: 0,
-          reference_type: "container_sales",
-          reference_id: id,
-          created_by: user?.id,
-          currency,
-          fx_rate: fxRate,
-          base_currency: orgBase,
-        },
-      ]);
+      const { error: cogsErr } = await (supabase as any).rpc("post_container_sale_cogs", { _sale_id: id });
+      if (cogsErr) throw cogsErr;
 
 
       // 5. Update sale record. Documents (EIR/receipt) show the depot as outgoing

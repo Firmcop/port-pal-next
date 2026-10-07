@@ -175,6 +175,7 @@ export default function Invoices() {
       const payload = {
         invoice_number: generateInvoiceNumber(),
         customer_name: form.customer_name,
+        customer_id: form.customer_pick || null,
         customer_reference: form.customer_reference || null,
         container_id: (form.container_ids?.[0] as string) || null,
         invoice_type: form.invoice_type,
@@ -343,6 +344,18 @@ export default function Invoices() {
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["invoices"] }); toast({ title: "Invoice voided" }); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const creditNote = useMutation({
+    mutationFn: async ({ id, amount, reason }: { id: string; amount: number | null; reason: string }) => {
+      const { error } = await (supabase as any).rpc("create_credit_note", { _invoice_id: id, _amount: amount, _reason: reason });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      toast({ title: "Credit note issued" });
+    },
+    onError: (e: any) => toast({ title: "Could not issue credit note", description: e.message, variant: "destructive" }),
   });
 
   const [payDialog, setPayDialog] = useState<any>(null);
@@ -795,7 +808,7 @@ export default function Invoices() {
                             </Button>
                           )
                         )}
-                        {(inv.status === "sent" || inv.status === "overdue") && (() => {
+                        {(inv.status === "sent" || inv.status === "overdue") && !inv.credit_of_invoice_id && (() => {
                           const paidSoFar = (inv.payments ?? []).reduce((s: number, p: any) => s + parseFloat(p.amount), 0);
                           const bal = Math.max(0, parseFloat(inv.total_amount) - paidSoFar);
                           return (
@@ -804,6 +817,19 @@ export default function Invoices() {
                             </Button>
                           );
                         })()}
+                        {!inv.credit_of_invoice_id && ["sent","overdue","paid"].includes(inv.status) && (
+                          <Button size="sm" variant="ghost" title="Issue a credit note against this invoice" onClick={() => {
+                            const raw = window.prompt(`Credit note amount for ${inv.invoice_number} (leave blank to credit the whole unpaid balance)`, "");
+                            if (raw === null) return;
+                            const amount = raw.trim() === "" ? null : Number(raw.replace(/,/g, ""));
+                            if (amount !== null && (!Number.isFinite(amount) || amount <= 0)) {
+                              toast({ title: "Enter a positive amount", variant: "destructive" });
+                              return;
+                            }
+                            const reason = window.prompt("Reason for the credit note?", "") ?? "";
+                            creditNote.mutate({ id: inv.id, amount, reason });
+                          }}>Credit</Button>
+                        )}
                         {inv.invoice_type === "gate_fee" && !["cancelled","credited"].includes(inv.status) && (
                           <Button size="sm" variant="ghost" title="Void / Refund" onClick={() => {
                             const reason = window.prompt("Void reason?", "Manual void");

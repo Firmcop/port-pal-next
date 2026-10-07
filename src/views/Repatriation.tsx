@@ -430,21 +430,8 @@ export default function Repatriation() {
         }
 
         // Post cost-side accounting entries (revenue is now driven by the invoice).
-        const repCosts = repatriationCosts.filter((c: any) => c.repatriation_id === id);
-        const totalCost = repCosts.reduce((s: number, c: any) => s + Number(c.amount), 0);
-        if (totalCost > 0) {
-          const txnNum2 = `TXN-REPC-${Date.now().toString(36).toUpperCase()}`;
-          await supabase.from("accounting_transactions").insert({
-            transaction_number: txnNum2,
-            account_type: "cost_of_goods" as any,
-            category: "repatriation_cost",
-            description: `Repatriation costs ${rep.repatriation_number}`,
-            debit_amount: totalCost,
-            credit_amount: 0,
-            reference_id: id,
-            reference_type: "repatriation",
-          } as any);
-        }
+        const { error: costErr } = await (supabase as any).rpc("post_repatriation_costs", { _repatriation_id: id });
+        if (costErr) throw costErr;
         return { ownerInvoiceId };
       } else if (action === "cancel") {
         if (["completed", "cancelled"].includes(rep.status)) throw new Error("Cannot cancel");

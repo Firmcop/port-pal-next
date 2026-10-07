@@ -41,7 +41,7 @@ export default function Journals() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("accounting_transactions")
-        .select("id, transaction_number, transaction_date, description, debit_amount, credit_amount, journal_id, gl_account_id, currency")
+        .select("id, transaction_number, transaction_date, description, debit_amount, credit_amount, journal_id, gl_account_id, currency, external_reference")
         .eq("reference_type", "manual_journal")
         .order("transaction_date", { ascending: false })
         .limit(500);
@@ -95,6 +95,20 @@ export default function Journals() {
       toast({ title: "Journal posted" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  // Posted ledger lines can't be edited; a wrong journal is corrected by reversing it.
+  const reverse = useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      const { error } = await (supabase as any).rpc("reverse_journal", { _journal_id: id, _reason: reason || null });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["manual-journals"] });
+      qc.invalidateQueries({ queryKey: ["gl-balances"] });
+      toast({ title: "Journal reversed" });
+    },
+    onError: (e: any) => toast({ title: "Could not reverse", description: e.message, variant: "destructive" }),
   });
 
   return (
@@ -179,21 +193,28 @@ export default function Journals() {
                 <TableHead>Description</TableHead>
                 <TableHead className="text-right">Debit</TableHead>
                 <TableHead className="text-right">Credit</TableHead>
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
               {!groupedJournals.length ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No manual journals yet.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No manual journals yet.</TableCell></TableRow>
               ) : groupedJournals.map(([jid, ls]) => {
                 const totD = ls.reduce((s, l) => s + Number(l.debit_amount || 0), 0);
                 const totC = ls.reduce((s, l) => s + Number(l.credit_amount || 0), 0);
                 return (
                   <TableRow key={jid}>
                     <TableCell className="text-xs">{format(new Date(ls[0].transaction_date), "yyyy-MM-dd")}</TableCell>
-                    <TableCell className="font-mono text-xs">{ls[0].transaction_number?.split("-").slice(0, 3).join("-")}</TableCell>
+                    <TableCell className="font-mono text-xs">{ls[0].external_reference || ls[0].transaction_number?.split("-").slice(0, 3).join("-")}</TableCell>
                     <TableCell className="text-sm">{ls[0].description} <span className="text-muted-foreground">({ls.length} lines)</span></TableCell>
-                    <TableCell className="text-right font-mono">{fmtMoney(totD)}</TableCell>
-                    <TableCell className="text-right font-mono">{fmtMoney(totC)}</TableCell>
+                    <TableCell className="text-right font-mono">{fmtMoney(totD, ls[0].currency)}</TableCell>
+                    <TableCell className="text-right font-mono">{fmtMoney(totC, ls[0].currency)}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="ghost" disabled={reverse.isPending} onClick={() => {
+                        const reason = window.prompt("Reverse this journal? Give a reason:", "");
+                        if (reason !== null) reverse.mutate({ id: jid, reason });
+                      }}>Reverse</Button>
+                    </TableCell>
                   </TableRow>
                 );
               })}
