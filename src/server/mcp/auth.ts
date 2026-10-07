@@ -2,7 +2,16 @@ import "server-only";
 
 /** OAuth 2.1 metadata for the MCP endpoint. Supabase Auth is the authorization server. */
 
+/**
+ * The origin the client actually called, so the advertised resource URL matches
+ * on every domain (vercel.app staging and portal.firmcop.com alike).
+ */
 export function siteOrigin(request: Request) {
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  if (host) {
+    const proto = request.headers.get("x-forwarded-proto") ?? new URL(request.url).protocol.replace(":", "");
+    return `${proto}://${host}`;
+  }
   return process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? new URL(request.url).origin;
 }
 
