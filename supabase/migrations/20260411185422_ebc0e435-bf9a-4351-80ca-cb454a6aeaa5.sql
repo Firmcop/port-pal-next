@@ -1,0 +1,1 @@
+ALTER TABLE public.repatriations ADD COLUMN eir_id uuid REFERENCES public.eir_records(id);

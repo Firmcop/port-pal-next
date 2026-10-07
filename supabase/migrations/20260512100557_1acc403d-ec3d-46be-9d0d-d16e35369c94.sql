@@ -1,0 +1,1 @@
+ALTER VIEW public.employee_balances SET (security_invoker = true);

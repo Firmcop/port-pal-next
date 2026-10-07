@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.stamp_project_from_material_movement() FROM PUBLIC, anon, authenticated;

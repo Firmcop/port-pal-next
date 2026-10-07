@@ -1,0 +1,1 @@
+ALTER VIEW public.conversion_variance_summary SET (security_invoker = true);

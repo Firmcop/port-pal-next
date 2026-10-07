@@ -1,0 +1,1110 @@
+[
+ {
+  "path": "",
+  "screen": "@/views/Index",
+  "guards": []
+ },
+ {
+  "path": "/inventory",
+  "screen": "@/views/Inventory",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/inventory/acquisition-backfill",
+  "screen": "@/views/AcquisitionBackfill",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/inventory/:id",
+  "screen": "@/views/ContainerDetail",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/yard-map",
+  "screen": "@/views/YardMap",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/movements",
+  "screen": "@/views/Movements",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/gate/dashboard",
+  "screen": "@/views/GateDashboard",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/gate/appointments",
+  "screen": "@/views/GateAppointments",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/gate/trucks-drivers",
+  "screen": "@/views/TrucksDrivers",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/gate/eir",
+  "screen": "@/views/EIRRecords",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/mr/inspections",
+  "screen": "@/views/Inspections",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/mr/estimates",
+  "screen": "@/views/DamageEstimates",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/mr/work-orders",
+  "screen": "@/views/WorkOrders",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/billing/tariffs",
+  "screen": "@/views/Tariffs",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/billing/invoices",
+  "screen": "@/views/Invoices",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/billing/payments",
+  "screen": "@/views/Payments",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/finance/contra-settlements",
+  "screen": "@/views/finance/ContraSettlements",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/finance/counterparty-reconciliation",
+  "screen": "@/views/finance/CounterpartyReconciliation",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/finance/watchdog",
+  "screen": "@/views/finance/FinanceWatchdog",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/finance/accounting-policies",
+  "screen": "@/views/finance/AccountingPolicies",
+  "guards": [
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/loans",
+  "screen": "@/views/finance/Loans",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/loans/:id",
+  "screen": "@/views/finance/LoanDetail",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/loans/:id/reconciliation",
+  "screen": "@/views/finance/LoanReconciliation",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/commitments",
+  "screen": "@/views/finance/Commitments",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/billing/reconciliation",
+  "screen": "@/views/GateFeeReconciliation",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/reports",
+  "screen": "@/views/Reports",
+  "guards": []
+ },
+ {
+  "path": "/users",
+  "screen": "@/views/Users",
+  "guards": []
+ },
+ {
+  "path": "/settings",
+  "screen": "@/views/DepotSettings",
+  "guards": [
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/settings/subscription",
+  "screen": "@/views/SubscriptionSettings",
+  "guards": [
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/settings/trial",
+  "screen": "@/views/TrialSettings",
+  "guards": [
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/settings/audit-log",
+  "screen": "@/views/AuditLog",
+  "guards": [
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/conversions",
+  "screen": "@/views/Conversions",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/conversions/cost-sync",
+  "screen": "@/views/conversions/ConversionCostSync",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/conversions/:id",
+  "screen": "@/views/ConversionDetail",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/finished-products",
+  "screen": "@/views/FinishedProducts",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/sub-assembly-stock",
+  "screen": "@/views/SubAssemblyStock",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/sales",
+  "screen": "@/views/ContainerSales",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/repatriation",
+  "screen": "@/views/Repatriation",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/repatriation/rate-cards",
+  "screen": "@/views/repatriation/RateCards",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/repatriation/profitability",
+  "screen": "@/views/repatriation/Profitability",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/accounting/transactions",
+  "screen": "@/views/AccountingTransactions",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/accounting/summary",
+  "screen": "@/views/FinancialSummary",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/accounts",
+  "screen": "@/views/finance/Accounts",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/accounts/:id",
+  "screen": "@/views/finance/AccountDetail",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/transfers",
+  "screen": "@/views/finance/Transfers",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/reconciliations",
+  "screen": "@/views/finance/Reconciliations",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/reconciliations/:id",
+  "screen": "@/views/finance/ReconciliationWorkspace",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/fx-rates",
+  "screen": "@/views/finance/FxRates",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/currency-backfill",
+  "screen": "@/views/finance/CurrencyBackfill",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/sales-currency-reconciliation",
+  "screen": "@/views/finance/SalesCurrencyReconciliation",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/adopt-legacy-data",
+  "screen": "@/views/finance/AdoptLegacyData",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/projects",
+  "screen": "@/views/finance/Projects",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/projects/:id",
+  "screen": "@/views/finance/ProjectDetail",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/dashboard",
+  "screen": "@/views/finance/Dashboard",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/ledger",
+  "screen": "@/views/finance/Ledger",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/chart-of-accounts",
+  "screen": "@/views/finance/ChartOfAccounts",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/periods",
+  "screen": "@/views/finance/Periods",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/journals",
+  "screen": "@/views/finance/Journals",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/reports/trial-balance",
+  "screen": "@/views/finance/TrialBalance",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/reports/profit-loss",
+  "screen": "@/views/finance/ProfitLoss",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/reports/project-pnl",
+  "screen": "@/views/finance/ProjectPnL",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/reports/balance-sheet",
+  "screen": "@/views/finance/BalanceSheet",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/reports/aging",
+  "screen": "@/views/finance/Aging",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/recurring-invoices",
+  "screen": "@/views/finance/RecurringInvoices",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/supplier-invoices",
+  "screen": "@/views/finance/SupplierInvoices",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/control-room",
+  "screen": "@/views/finance/ControlRoom",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/invoice-reconciliation",
+  "screen": "@/views/finance/InvoiceReconciliation",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/acquisition-duplicates",
+  "screen": "@/views/finance/AcquisitionDuplicates",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/supplier-pricing",
+  "screen": "@/views/finance/SupplierPurchasePricing",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/supplier-statement",
+  "screen": "@/views/finance/SupplierStatementReconciliation",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/dunning",
+  "screen": "@/views/finance/DunningRules",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/statements",
+  "screen": "@/views/finance/Statements",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/tax-codes",
+  "screen": "@/views/finance/TaxCodes",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/tax-returns",
+  "screen": "@/views/finance/TaxReturns",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/withholding",
+  "screen": "@/views/finance/Withholding",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/budgets",
+  "screen": "@/views/finance/Budgets",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/budget-variance",
+  "screen": "@/views/finance/BudgetVariance",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/budgets-vs-actual",
+  "screen": "@/views/finance/BudgetsVsActual",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/cashflow-forecast",
+  "screen": "@/views/finance/CashflowForecast",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/fx-revaluation",
+  "screen": "@/views/finance/FxRevaluation",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/fixed-assets",
+  "screen": "@/views/finance/FixedAssets",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/expense-categories",
+  "screen": "@/views/finance/ExpenseCategories",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/opex-report",
+  "screen": "@/views/finance/OpexReport",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/operating-expenses",
+  "screen": "@/views/finance/OperatingExpenses",
+  "guards": [
+   "RequireExpenseAccess"
+  ]
+ },
+ {
+  "path": "/finance/expense-claims",
+  "screen": "@/views/finance/ExpenseClaims",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/petty-cash",
+  "screen": "@/views/finance/PettyCash",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/approvals",
+  "screen": "@/views/finance/Approvals",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/period-close",
+  "screen": "@/views/finance/PeriodClose",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/year-end-close",
+  "screen": "@/views/finance/YearEndClose",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/finance/audit-log",
+  "screen": "@/views/finance/AuditLog",
+  "guards": [
+   "RequireModule",
+   "RequireRole"
+  ]
+ },
+ {
+  "path": "/assets",
+  "screen": "@/views/assets/AssetsRegister",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/assets/maintenance",
+  "screen": "@/views/assets/AssetMaintenance",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/assets/disposals",
+  "screen": "@/views/assets/AssetDisposals",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/assets/issues",
+  "screen": "@/views/assets/AssetIssues",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/assets/:id",
+  "screen": "@/views/assets/AssetDetail",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/customers",
+  "screen": "@/views/Customers",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/leads",
+  "screen": "@/views/Leads",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/deals",
+  "screen": "@/views/Deals",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/quotes",
+  "screen": "@/views/Quotes",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/quotes/:id",
+  "screen": "@/views/QuoteDetail",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/crm/quote-templates",
+  "screen": "@/views/crm/QuoteTemplates",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/crm/website-catalog",
+  "screen": "@/views/crm/WebsiteCatalog",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/sales-orders",
+  "screen": "@/views/SalesOrders",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/materials",
+  "screen": "@/views/Materials",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/materials/:id",
+  "screen": "@/views/inventory/MaterialDetail",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/stock-adjustments",
+  "screen": "@/views/inventory/StockAdjustments",
+  "guards": []
+ },
+ {
+  "path": "/stock-reconciliation",
+  "screen": "@/views/inventory/StockReconciliation",
+  "guards": []
+ },
+ {
+  "path": "/suppliers",
+  "screen": "@/views/Suppliers",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/procurement",
+  "screen": "@/views/PurchaseOrders",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/procurement/rfqs",
+  "screen": "@/views/procurement/RFQs",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/procurement/rfqs/:id",
+  "screen": "@/views/procurement/RFQDetail",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/leasing/quotations",
+  "screen": "@/views/leasing/LeaseQuotations",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/leasing/agreements",
+  "screen": "@/views/leasing/LeaseAgreements",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/leasing/agreements/:id",
+  "screen": "@/views/leasing/LeaseAgreementDetail",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/leasing/units",
+  "screen": "@/views/leasing/LeaseUnits",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/leasing/tracker",
+  "screen": "@/views/leasing/LeaseTracker",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/leasing/billing",
+  "screen": "@/views/leasing/LeaseBillingRun",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/hrm/employees",
+  "screen": "@/views/hrm/Employees",
+  "guards": [
+   "RequireModule",
+   "RequirePermission"
+  ]
+ },
+ {
+  "path": "/hrm/employees/:id",
+  "screen": "@/views/hrm/EmployeeDetail",
+  "guards": [
+   "RequireModule",
+   "RequirePermission"
+  ]
+ },
+ {
+  "path": "/hrm/attendance",
+  "screen": "@/views/hrm/Attendance",
+  "guards": [
+   "RequireModule",
+   "RequirePermission"
+  ]
+ },
+ {
+  "path": "/hrm/payslips",
+  "screen": "@/views/hrm/Payslips",
+  "guards": [
+   "RequireModule",
+   "RequirePermission"
+  ]
+ },
+ {
+  "path": "/hrm/payslips/:id",
+  "screen": "@/views/hrm/PayslipDetail",
+  "guards": [
+   "RequireModule",
+   "RequirePermission"
+  ]
+ },
+ {
+  "path": "/hrm/payroll-runs",
+  "screen": "@/views/hrm/PayrollRuns",
+  "guards": [
+   "RequireModule",
+   "RequirePermission"
+  ]
+ },
+ {
+  "path": "/hrm/wage-reconciliation",
+  "screen": "@/views/hrm/WageReconciliation",
+  "guards": [
+   "RequireModule",
+   "RequirePermission"
+  ]
+ },
+ {
+  "path": "/hrm/payroll-reconciliation",
+  "screen": "@/views/hrm/PayrollReconciliation",
+  "guards": [
+   "RequireModule",
+   "RequirePermission"
+  ]
+ },
+ {
+  "path": "/hrm/settings/payslip-template",
+  "screen": "@/views/hrm/PayslipTemplateSettings",
+  "guards": [
+   "RequireModule",
+   "RequirePermission"
+  ]
+ },
+ {
+  "path": "/logistics",
+  "screen": "@/views/logistics/LogisticsDashboard",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/logistics/carriers",
+  "screen": "@/views/logistics/Carriers",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/logistics/vehicles",
+  "screen": "@/views/logistics/Vehicles",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/logistics/drivers",
+  "screen": "@/views/logistics/Drivers",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/logistics/routes",
+  "screen": "@/views/logistics/Routes",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/logistics/orders",
+  "screen": "@/views/logistics/TransportOrders",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/logistics/orders/:id",
+  "screen": "@/views/logistics/TransportOrderDetail",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/logistics/trips",
+  "screen": "@/views/logistics/Trips",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/logistics/trips/:id",
+  "screen": "@/views/logistics/TripDetail",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/logistics/billing",
+  "screen": "@/views/logistics/BillingRun",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/logistics/costs",
+  "screen": "@/views/logistics/Costs",
+  "guards": [
+   "RequireModule"
+  ]
+ },
+ {
+  "path": "/portal/dashboard",
+  "screen": "@/views/portal/PortalDashboard",
+  "guards": []
+ },
+ {
+  "path": "/portal/inventory",
+  "screen": "@/views/portal/PortalInventory",
+  "guards": []
+ },
+ {
+  "path": "/portal/appointments",
+  "screen": "@/views/portal/PortalAppointments",
+  "guards": []
+ },
+ {
+  "path": "/portal/eirs",
+  "screen": "@/views/portal/PortalEirApprovals",
+  "guards": []
+ },
+ {
+  "path": "/portal/releases",
+  "screen": "@/views/portal/PortalReleases",
+  "guards": []
+ },
+ {
+  "path": "/portal/movements",
+  "screen": "@/views/portal/PortalMovements",
+  "guards": []
+ },
+ {
+  "path": "/portal/billing",
+  "screen": "@/views/portal/PortalBilling",
+  "guards": []
+ },
+ {
+  "path": "/portal/notifications",
+  "screen": "@/views/portal/PortalNotifications",
+  "guards": []
+ },
+ {
+  "path": "/portal/leases",
+  "screen": "@/views/portal/PortalLeases",
+  "guards": []
+ },
+ {
+  "path": "/portal/leases/:id",
+  "screen": "@/views/portal/PortalLeaseDetail",
+  "guards": []
+ },
+ {
+  "path": "/vendor/organizations",
+  "screen": "@/views/vendor/VendorOrganizations",
+  "guards": []
+ },
+ {
+  "path": "/vendor/organizations/:id",
+  "screen": "@/views/vendor/VendorOrganizationDetail",
+  "guards": []
+ },
+ {
+  "path": "/vendor/organizations/:orgId/depots/:depotId",
+  "screen": "@/views/vendor/VendorDepotDetail",
+  "guards": []
+ },
+ {
+  "path": "/vendor/modules",
+  "screen": "@/views/vendor/VendorModules",
+  "guards": []
+ },
+ {
+  "path": "/vendor/invoices",
+  "screen": "@/views/vendor/VendorInvoices",
+  "guards": []
+ },
+ {
+  "path": "/vendor/events",
+  "screen": "@/views/vendor/VendorLifecycleEvents",
+  "guards": []
+ },
+ {
+  "path": "/vendor/security",
+  "screen": "@/views/vendor/VendorSecurityFindings",
+  "guards": []
+ },
+ {
+  "path": "/vendor/db-load",
+  "screen": "@/views/vendor/VendorDbLoad",
+  "guards": []
+ },
+ {
+  "path": "/paywall",
+  "screen": "@/views/Paywall",
+  "guards": []
+ }
+]

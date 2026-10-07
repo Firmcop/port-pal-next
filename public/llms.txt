@@ -1,0 +1,74 @@
+# Port Pal
+
+> Port Pal is a multi-tenant Container Depot Management System (CDMS) for container terminals and depots. It covers yard management, gate operations, maintenance & repair, billing, logistics, leasing, sales/CRM, manufacturing (conversions), procurement, accounting, HRM & payroll, and a self-service customer portal. A separate vendor console manages organizations, licensing, and platform security.
+
+## Authentication
+
+Most pages require sign-in. Staff, customers, and platform admins each have their own login flow. Password recovery is available to all users.
+
+- [Forgot Password](/forgot-password): Request a password reset email.
+- [Reset Password](/reset-password): Set a new password from the recovery link.
+
+## Staff app
+
+- [Dashboard](/): Operations overview for depot staff.
+- [Staff Login](/login): Sign-in for operators, admins, and viewers.
+- [Inventory & Yard](/inventory): Container registry and 2D yard grid with stacking rules (weight, reefer, hazardous).
+- [Gate](/gate): Truck registry, appointments, gate-in/out with auto EIR and condition grading.
+- [EIR Records](/eir): Unified gate/sales/repatriation EIRs with edit and admin delete.
+- [Maintenance & Repair](/mr): Estimates, work orders, container availability auto-sync.
+- [Logistics](/logistics): Transport orders, routes, carrier rates, per-trip costing and revenue.
+- [Leasing](/leasing): Lease quotations and agreements.
+- [Sales / CRM](/sales): Leads, opportunities, sales orders feeding production.
+- [Manufacturing](/manufacturing): Production orders, BOM, labor and container assignment (stored as `conversions` in the DB).
+- [Procurement](/procurement): Purchase orders, goods receipts with variance approval workflow, vendor payments, automated job costing.
+- [Accounting](/accounting): Double-entry ledger, financial accounts, GL accounts, automated revenue/expense/COGS postings.
+- [HRM](/hrm): Employees, payroll runs, payslip approvals, payslip template settings.
+- [Reports](/reports): Recharts-based analytics, revenue by service line, exportable to CSV/PDF.
+- [Settings](/settings): Depot profile, tariffs, users & roles, granular permissions matrix, notification preferences, system options.
+
+## Finance
+
+- [Finance Dashboard](/finance): KPIs across receivables, payables, and cash.
+- [Chart of Accounts](/finance/chart-of-accounts): GL account hierarchy.
+- [Supplier Invoices](/finance/supplier-invoices): Auto-generated `PINV-…` purchase invoices for container acquisitions and third-party sales.
+- [FX Rates](/finance/fx-rates): Maintain exchange rates used by ledger postings.
+- [Currency Backfill](/finance/currency-backfill): Rewrite historical accounting transactions to the correct sales currency.
+- [Sales Currency Reconciliation](/finance/sales-currency-reconciliation): Identify FX mismatches between sales and ledger.
+- [Adopt Legacy Data](/finance/adopt-legacy-data): Migrate rows from the default organization into your active tenant.
+- [Dunning Rules](/finance/dunning-rules): Automated overdue reminders.
+- [Tax Codes](/finance/tax-codes): VAT / withholding setup.
+- [Approvals](/finance/approvals): Manager approval queue (includes goods-receipt variances).
+
+## Customer portal
+
+- [Portal Login](/portal/login): Self-service sign-in for depot customers.
+- [Portal](/portal): Customer inventory, billing, and release instructions.
+
+## Vendor console (platform admins)
+
+- [Organizations](/vendor/organizations): Tenant management.
+- [Modules](/vendor/modules): Per-org module licensing catalog.
+- [Invoices](/vendor/invoices): Vendor-side billing.
+- [Lifecycle Events](/vendor/lifecycle-events): Platform audit timeline.
+- [Security Findings](/vendor/security): Scan results, KPI summary, filters, and per-finding remediation SQL.
+
+## Capabilities
+
+- Multi-tenant isolation via Postgres RLS (`current_org_id()`, `is_platform_admin()`).
+- Subscription-aware sidebar: `get_user_view_modules()` intersects role permissions with `subscription_modules`, hiding non-licensed modules.
+- Seat-limit enforcement via `check_seat_capacity()` in the invite/create staff edge functions, with a live seat chip in the Invite wizard.
+- Granular RBAC across 12 roles: `app_action` enum + role defaults + per-user overrides, checked through `has_permission()` and scoped to the user's current organization.
+- Immutable audit trails for all container movements; full goods-receipt audit (`goods_receipt_audit`) with manager approval (`approval_requests`).
+- Procurement variance handling: over-receipts auto-raise a supplementary PO + invoice on approval; under-receipts auto-generate a supplier credit note.
+- Automatic supplier (`PINV-…`) purchase invoices on container acquisition and third-party container sales, linked back to `container_sales` via DB trigger.
+- Split container cost model (purchase price vs transport & offloading) with retroactive adjustment RPCs that post offsetting ledger entries.
+- Multi-currency: per-customer/supplier currency override, `fx_rates` table + `get_fx_rate`, FX rate stamped on every ledger transaction, plus backfill and reconciliation tooling.
+- Dwell-time storage billing from tariff rate cards; currency auto-filled from organization currency (no hardcoded USD/EUR).
+- Automated accounting postings for revenue, expenses, and COGS; full job-costing engine across procurement and manufacturing.
+- Repatriation workflow with per-trip costing and auto EIR + ledger entries.
+- Unified EIR numbering across gate, sales, and repatriation via `next_eir_number()`; mandatory gate-in photos; automatic gate-fee stamping from active tariffs.
+- Password recovery flow via Supabase Auth recovery links.
+- Document generation with SHA-256 hash, QR verification, watermarks, and captured issuer.
+- Real-time alerts: Web Push (VAPID, Service Worker) and WhatsApp Cloud API with Gemini Flash intent parsing.
+- Role-scoped storage: `container-photos` (staff only), `depot-assets` (org-scoped letterhead/logos).

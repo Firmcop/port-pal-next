@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.trg_supplier_invoice_auto_edi() FROM PUBLIC, anon, authenticated;

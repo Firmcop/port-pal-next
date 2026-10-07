@@ -1,0 +1,1 @@
+ALTER TABLE public.sub_assembly_bom_labor ADD COLUMN IF NOT EXISTS employee_id uuid REFERENCES public.employees(id) ON DELETE SET NULL;

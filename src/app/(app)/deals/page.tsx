@@ -1,0 +1,15 @@
+"use client";
+
+import dynamic from "next/dynamic";
+import { PageLoader } from "@/components/PageLoader";
+import { RequireModule } from "@/components/RequireModule";
+
+const Screen = dynamic(() => import("@/views/Deals"), {
+  ssr: false,
+  loading: () => <PageLoader />,
+});
+
+// Route migrated from react-router: /deals
+export default function Page() {
+  return <RequireModule code="crm"><Screen /></RequireModule>;
+}

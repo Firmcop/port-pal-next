@@ -1,0 +1,17 @@
+REVOKE EXECUTE ON FUNCTION public.attendance_line_components(uuid,text,numeric,numeric,numeric,numeric) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.employee_deductions(uuid,numeric,text) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.recalc_attendance_week(uuid) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.correct_attendance_line(uuid,numeric,numeric,numeric,numeric,text,uuid,uuid,text) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.upsert_attendance_line(uuid,uuid,numeric,numeric,numeric,uuid,uuid,text,uuid,numeric,text) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.delete_attendance_line(uuid) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.approve_attendance_week(uuid) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.pay_attendance_week(uuid,uuid) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.generate_monthly_wage_payslips(date) FROM anon, public;
+GRANT EXECUTE ON FUNCTION public.attendance_line_components(uuid,text,numeric,numeric,numeric,numeric) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.employee_deductions(uuid,numeric,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.correct_attendance_line(uuid,numeric,numeric,numeric,numeric,text,uuid,uuid,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.upsert_attendance_line(uuid,uuid,numeric,numeric,numeric,uuid,uuid,text,uuid,numeric,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.delete_attendance_line(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.approve_attendance_week(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.pay_attendance_week(uuid,uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.generate_monthly_wage_payslips(date) TO authenticated;

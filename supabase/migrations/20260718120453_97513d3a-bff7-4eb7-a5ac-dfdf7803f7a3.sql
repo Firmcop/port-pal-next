@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS default_depot_id uuid REFERENCES public.depots(id) ON DELETE SET NULL;

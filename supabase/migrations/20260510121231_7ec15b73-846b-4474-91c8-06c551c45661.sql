@@ -1,0 +1,2 @@
+ALTER TABLE public.lease_quotations ADD COLUMN height_class public.container_height_class;
+UPDATE public.lease_quotations SET height_class = 'LC' WHERE container_category = 'dry' AND height_class IS NULL;
