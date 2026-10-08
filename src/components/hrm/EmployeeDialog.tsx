@@ -23,7 +23,7 @@ const empty = {
   division: "", control_account_id: "", status: "active",
   daily_rate: "0", hired_on: "", tax_id: "", notes: "",
   pay_frequency: "monthly", pay_basis: "daily", hourly_rate: "0",
-  monthly_salary: "0", overtime_multiplier: "1.5",
+  monthly_salary: "0", overtime_multiplier: "1.5", statutory_exempt: false,
   deductions: [] as any[],
 };
 
@@ -64,6 +64,7 @@ export function EmployeeDialog({ open, onOpenChange, employee, onSaved }: Props)
         hourly_rate: String(employee.hourly_rate ?? "0"),
         monthly_salary: String(employee.monthly_salary ?? "0"),
         overtime_multiplier: String(employee.overtime_multiplier ?? "1.5"),
+        statutory_exempt: !!employee.statutory_exempt,
         deductions: Array.isArray(employee.deductions) ? employee.deductions : [],
 
       });
@@ -100,6 +101,7 @@ export function EmployeeDialog({ open, onOpenChange, employee, onSaved }: Props)
         hourly_rate: parseFloat(form.hourly_rate) || 0,
         monthly_salary: parseFloat(form.monthly_salary) || 0,
         overtime_multiplier: parseFloat(form.overtime_multiplier) || 1.5,
+        statutory_exempt: !!form.statutory_exempt,
         deductions: (form.deductions ?? []).filter((d: Deduction) => d.name && Number(d.value) !== 0),
 
       };
@@ -172,6 +174,10 @@ export function EmployeeDialog({ open, onOpenChange, employee, onSaved }: Props)
             <div className="space-y-1"><Label>Hourly rate</Label><Input type="number" step="0.01" value={form.hourly_rate} onChange={(e) => set("hourly_rate", e.target.value)} /></div>
             <div className="space-y-1"><Label>Monthly salary</Label><Input type="number" step="0.01" value={form.monthly_salary} onChange={(e) => set("monthly_salary", e.target.value)} /></div>
             <div className="space-y-1"><Label>Overtime multiplier</Label><Input type="number" step="0.1" value={form.overtime_multiplier} onChange={(e) => set("overtime_multiplier", e.target.value)} /></div>
+            <label className="col-span-full flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-1" checked={!!form.statutory_exempt} onChange={(e) => set("statutory_exempt", e.target.checked)} />
+              <span>No statutory deductions (PAYE, NSSF, SHIF, Housing Levy) — only for staff legally exempt, e.g. non-resident contractors</span>
+            </label>
             <div className="space-y-1"><Label>Daily rate</Label><Input type="number" step="0.01" value={form.daily_rate} onChange={(e) => set("daily_rate", e.target.value)} /></div>
             <div className="space-y-1"><Label>Hire date</Label><Input type="date" value={form.hired_on} onChange={(e) => set("hired_on", e.target.value)} /></div>
             <div className="space-y-1"><Label>Tax ID</Label><Input value={form.tax_id} onChange={(e) => set("tax_id", e.target.value)} /></div>

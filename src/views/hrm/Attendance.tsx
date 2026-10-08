@@ -395,12 +395,28 @@ export default function Attendance() {
     onError: (e: any) => toast({ title: "Approval failed", description: e.message, variant: "destructive" }),
   });
 
+  // amount still owed on a paid week (e.g. a correction added wages after payment)
+  const { data: balanceDue = 0 } = useQuery({
+    queryKey: ["attendance-balance-due", week?.id, week?.status],
+    enabled: !!week?.id && week?.status === "paid",
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("attendance_week_balance_due", { _week_id: week!.id });
+      if (error) throw error;
+      return Number(data ?? 0);
+    },
+  });
+
   const pay = useMutation({
     mutationFn: async () => {
       const { error } = await (supabase as any).rpc("pay_attendance_week", { _week_id: week.id, _from_account_id: payAccount });
       if (error) throw error;
     },
-    onSuccess: () => { setPayOpen(false); toast({ title: "Net wages paid" }); refresh(); },
+    onSuccess: () => {
+      setPayOpen(false);
+      toast({ title: week?.status === "paid" ? "Balance paid" : "Net wages paid" });
+      qc.invalidateQueries({ queryKey: ["attendance-balance-due"] });
+      refresh();
+    },
     onError: (e: any) => toast({ title: "Payment failed", description: e.message, variant: "destructive" }),
   });
 
@@ -452,6 +468,9 @@ export default function Attendance() {
             )}
             {!restricted && week?.status === "approved" && (
               <Button size="sm" onClick={() => setPayOpen(true)}><Wallet className="mr-1 h-4 w-4" />Pay wages</Button>
+            )}
+            {!restricted && week?.status === "paid" && balanceDue > 0.004 && (
+              <Button size="sm" onClick={() => setPayOpen(true)}><Wallet className="mr-1 h-4 w-4" />Pay balance {formatMoney(balanceDue, currency)}</Button>
             )}
           </div>
         </CardHeader>
@@ -663,6 +682,9 @@ export default function Attendance() {
               <div className="flex justify-between"><span className="text-muted-foreground">Gross</span><span className="font-mono">{formatMoney(Number(week?.gross_amount ?? gross), currency)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Deductions</span><span className="font-mono">- {formatMoney(deductionTotal, currency)}</span></div>
               <div className="flex justify-between pt-1 border-t"><span className="font-medium">Net payable</span><span className="text-xl font-bold">{formatMoney(net, currency)}</span></div>
+              {week?.status === "paid" && (
+                <div className="flex justify-between pt-1 border-t"><span className="font-medium">Balance still owed (corrections)</span><span className="text-xl font-bold">{formatMoney(balanceDue, currency)}</span></div>
+              )}
             </div>
             <div className="space-y-1">
               <Label>Paying account</Label>
