@@ -67,6 +67,7 @@ export default {
     hrm_attendance: "Présence hebdomadaire",
     hrm_payslips: "Bulletins de paie",
     hrm_payroll_reconciliation: "Payroll Reconciliation",
+    hrm_statutory_returns: "Statutory Returns (P10 / P9)",
     hrm_wage_reconciliation: "Wage Reconciliation",
     hrm_payslip_template: "Payslip Template",
     logistics: "Logistics",

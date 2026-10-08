@@ -151,6 +151,7 @@ const hrmItems: Item[] = [
   { key: "hrm_payslips", url: "/hrm/payslips", icon: BadgeDollarSign, module: "hrm", action: "approve" },
   { key: "hrm_payroll_runs", url: "/hrm/payroll-runs", icon: ClipboardList, module: "hrm", action: "approve" },
   { key: "hrm_payroll_reconciliation", url: "/hrm/payroll-reconciliation", icon: ClipboardList, module: "hrm", action: "approve" },
+  { key: "hrm_statutory_returns", url: "/hrm/statutory-returns", icon: ClipboardList, module: "hrm", action: "approve" },
   { key: "hrm_wage_reconciliation", url: "/hrm/wage-reconciliation", icon: ClipboardList, module: "hrm", action: "approve" },
   { key: "hrm_payslip_template", url: "/hrm/settings/payslip-template", icon: ClipboardList, module: "hrm", action: "approve" },
 ];

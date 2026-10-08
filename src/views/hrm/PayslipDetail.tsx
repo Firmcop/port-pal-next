@@ -35,6 +35,9 @@ const LINE_TYPES = [
   { value: "contribution", label: "Contribution" },
 ];
 
+// PAYE, NSSF, SHIF and Housing Levy are calculated by the database from the earnings.
+const STATUTORY = ["PAYE", "NSSF", "SHIF", "AHL", "NSSF_ER", "AHL_ER"];
+
 export default function HRMPayslipDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -304,10 +307,13 @@ export default function HRMPayslipDetail() {
                   <TableRow><TableCell colSpan={3} className="text-center py-4 text-muted-foreground text-sm">No {type} lines.</TableCell></TableRow>
                 ) : grouped[type].map((l: any) => (
                   <TableRow key={l.id}>
-                    <TableCell>{l.label}</TableCell>
+                    <TableCell>
+                      {l.label}
+                      {STATUTORY.includes(l.code) && <span className="ml-2 text-xs text-muted-foreground">auto</span>}
+                    </TableCell>
                     <TableCell className="text-right font-mono">{Number(l.amount).toFixed(2)}</TableCell>
                     <TableCell>
-                      {editable && <Button variant="ghost" size="icon" onClick={() => deleteLine.mutate(l.id)}><Trash2 className="h-4 w-4" /></Button>}
+                      {editable && !STATUTORY.includes(l.code) && <Button variant="ghost" size="icon" onClick={() => deleteLine.mutate(l.id)}><Trash2 className="h-4 w-4" /></Button>}
                     </TableCell>
                   </TableRow>
                 ))}
