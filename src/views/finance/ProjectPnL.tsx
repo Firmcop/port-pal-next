@@ -68,7 +68,7 @@ export default function ProjectPnL() {
         .in("account_type", ["revenue", "cost_of_goods", "expense"])
         .order("transaction_date", { ascending: false }).limit(1000);
       if (from) q = q.gte("transaction_date", from);
-      if (to) q = q.lte("transaction_date", to);
+      if (to) { const d = new Date(to); d.setDate(d.getDate() + 1); q = q.lt("transaction_date", d.toISOString().slice(0, 10)); }
       const { data, error } = await q;
       if (error) throw error;
       return data ?? [];

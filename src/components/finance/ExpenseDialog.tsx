@@ -209,7 +209,7 @@ export function ExpenseDialog({
         _financial_account_id: mode === "paid" ? accountId : null,
         _due_date: mode === "credit" ? dueDate : null,
         _currency: currency || null,
-        _fx_rate: 1,
+        _fx_rate: null, // the database applies the day's rate for foreign-currency expenses
         _depot_id: depotId || null,
         _project_id: projectId || null,
         _reference: reference || null,
