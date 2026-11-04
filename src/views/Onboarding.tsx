@@ -88,7 +88,7 @@ export default function Onboarding() {
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      const trialEnd = new Date(Date.now() + 14 * 86400000).toLocaleDateString();
+      const trialEnd = new Date(Date.now() + 30 * 86400000).toLocaleDateString();
       toast.success(`Trial started — ends ${trialEnd}`);
       // Hard reload so RLS / membership context refreshes cleanly.
       window.location.href = "/";
@@ -110,7 +110,7 @@ export default function Onboarding() {
             <CardTitle>Set up your depot organization</CardTitle>
           </div>
           <CardDescription>
-            Welcome! Create your organization to start your 14-day free trial of all CDMS modules.
+            Welcome! Create your organization to start your 30-day free trial of all CDMS modules.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -193,7 +193,7 @@ export default function Onboarding() {
               <ul className="text-sm text-muted-foreground space-y-1.5">
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="h-4 w-4 mt-0.5 text-primary shrink-0" />
-                  Create your organization on a 14-day trial with all modules unlocked
+                  Create your organization on a 30-day trial with all modules unlocked
                 </li>
                 <li className="flex items-start gap-2">
                   <ShieldCheck className="h-4 w-4 mt-0.5 text-primary shrink-0" />

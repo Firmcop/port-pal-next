@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
     await admin.rpc("log_org_event", {
       _org_id: org.id,
       _event_type: "trial_started",
-      _details: { trial_ends_at: org.trial_ends_at, days: 14 },
+      _details: { trial_ends_at: org.trial_ends_at, days: 30 },
       _actor: user.id,
     });
 

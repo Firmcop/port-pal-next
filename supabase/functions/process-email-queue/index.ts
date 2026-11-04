@@ -1,4 +1,4 @@
-import { sendLovableEmail } from 'npm:@lovable.dev/email-js'
+import { EmailSendError, sendViaResend, tagValue } from '../_shared/resend.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const MAX_RETRIES = 5
@@ -11,27 +11,23 @@ const DEFAULT_TRANSACTIONAL_TTL_MINUTES = 60
 // Uses EmailAPIError.status when available (email-js >=0.x with structured errors),
 // falls back to parsing the error message for older versions.
 function isRateLimited(error: unknown): boolean {
-  if (error && typeof error === 'object' && 'status' in error) {
-    return (error as { status: number }).status === 429
-  }
-  return error instanceof Error && error.message.includes('429')
+  return error instanceof EmailSendError && error.status === 429
 }
 
-// Check if an error is a forbidden (403) response. Retrying won't help.
-// Move straight to DLQ.
+// 401/403 = key or sending domain not set up; retrying won't help, and the
+// rest of the batch would fail the same way. Move to DLQ and stop.
 function isForbidden(error: unknown): boolean {
-  if (error && typeof error === 'object' && 'status' in error) {
-    return (error as { status: number }).status === 403
-  }
-  return error instanceof Error && error.message.includes('403')
+  return error instanceof EmailSendError && (error.status === 401 || error.status === 403)
+}
+
+// 400/422 = this message is invalid (bad address, missing field). Retrying won't help.
+function isInvalidMessage(error: unknown): boolean {
+  return error instanceof EmailSendError && (error.status === 400 || error.status === 422)
 }
 
 // Extract Retry-After seconds from a structured EmailAPIError, or default to 60s.
 function getRetryAfterSeconds(error: unknown): number {
-  if (error && typeof error === 'object' && 'retryAfterSeconds' in error) {
-    return (error as { retryAfterSeconds: number | null }).retryAfterSeconds ?? 60
-  }
-  return 60
+  return error instanceof EmailSendError ? (error.retryAfterSeconds ?? 60) : 60
 }
 
 function parseJwtClaims(token: string): Record<string, unknown> | null {
@@ -79,7 +75,7 @@ async function moveToDlq(
 }
 
 Deno.serve(async (req) => {
-  const apiKey = Deno.env.get('LOVABLE_API_KEY')
+  const apiKey = Deno.env.get('RESEND_API_KEY')
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
@@ -91,27 +87,25 @@ Deno.serve(async (req) => {
     )
   }
 
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return new Response(
-      JSON.stringify({ error: 'Unauthorized' }),
-      { status: 401, headers: { 'Content-Type': 'application/json' } }
-    )
-  }
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-  // Defense in depth: verify_jwt=true already requires a valid JWT at the
-  // gateway layer. This adds an explicit role check so only service-role
-  // callers can trigger queue processing.
-  const token = authHeader.slice('Bearer '.length).trim()
-  const claims = parseJwtClaims(token)
-  if (claims?.role !== 'service_role') {
+  // Callers: a service-role JWT, or the scheduled job, which sends the
+  // secret kept in the database vault ('email_queue_cron_secret').
+  const authHeader = req.headers.get('Authorization') ?? ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length).trim() : ''
+  const claims = token ? parseJwtClaims(token) : null
+  let allowed = claims?.role === 'service_role'
+  const cronSecret = req.headers.get('x-cron-secret')
+  if (!allowed && cronSecret) {
+    const { data: ok } = await supabase.rpc('email_cron_secret_ok', { _secret: cronSecret })
+    allowed = ok === true
+  }
+  if (!allowed) {
     return new Response(
       JSON.stringify({ error: 'Forbidden' }),
       { status: 403, headers: { 'Content-Type': 'application/json' } }
     )
   }
-
-  const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
   // 1. Check rate-limit cooldown and read queue config
   const { data: state } = await supabase
@@ -249,25 +243,24 @@ Deno.serve(async (req) => {
       }
 
       try {
-        await sendLovableEmail(
+        await sendViaResend(
           {
-            run_id: payload.run_id,
             to: payload.to,
             from: payload.from,
-            sender_domain: payload.sender_domain,
             subject: payload.subject,
             html: payload.html,
             text: payload.text,
-            purpose: payload.purpose,
-            label: payload.label,
-            idempotency_key: payload.idempotency_key,
-            unsubscribe_token: payload.unsubscribe_token,
-            message_id: payload.message_id,
+            idempotency_key: payload.idempotency_key ?? payload.message_id,
+            unsubscribe_url: payload.unsubscribe_token
+              // one-click unsubscribe (RFC 8058) is handled by the handle-email-unsubscribe function
+              ? `${supabaseUrl}/functions/v1/handle-email-unsubscribe?token=${encodeURIComponent(payload.unsubscribe_token)}`
+              : undefined,
+            tags: [
+              { name: 'queue', value: tagValue(queue) },
+              { name: 'template', value: tagValue(payload.label) },
+            ],
           },
-          // sendUrl is optional — when LOVABLE_SEND_URL is not set, the library
-          // falls back to the default Lovable API endpoint (https://api.lovable.dev).
-          // Set LOVABLE_SEND_URL as a Supabase secret to override (e.g. for local dev).
-          { apiKey, sendUrl: Deno.env.get('LOVABLE_SEND_URL') }
+          apiKey
         )
 
         // Log success
@@ -326,6 +319,11 @@ Deno.serve(async (req) => {
 
         // 403s are permanent configuration or authorization failures for this
         // message, so move straight to DLQ and stop processing the rest of the batch.
+        if (isInvalidMessage(error)) {
+          await moveToDlq(supabase, queue, msg, errorMsg.slice(0, 1000))
+          continue
+        }
+
         if (isForbidden(error)) {
           await moveToDlq(supabase, queue, msg, errorMsg.slice(0, 1000))
           return new Response(
