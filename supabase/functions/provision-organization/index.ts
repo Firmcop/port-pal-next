@@ -38,87 +38,22 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (existing) return json({ organization_id: existing.organization_id, existing: true });
 
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40)
-      + "-" + Math.random().toString(36).slice(2, 6);
-
-    const { data: org, error: orgErr } = await admin
-      .from("organizations")
-      .insert({
-        name,
-        slug,
-        country: country ?? null,
-        currency: currency ?? "USD",
-        timezone: timezone ?? "UTC",
-        owner_user_id: user.id,
-        billing_email: user.email,
-        status: "trial",
-      })
-      .select()
-      .single();
-    if (orgErr) throw orgErr;
-
-    await admin.from("organization_members").insert({
-      organization_id: org.id,
-      user_id: user.id,
-      role: "org_owner",
-      status: "active",
+    // Company, owner role, modules, first depot and country pack in one transaction.
+    const { data: result, error: coErr } = await admin.rpc("create_company", {
+      _owner: user.id,
+      _name: name,
+      _country: country ?? null,
+      _currency: currency ?? "USD",
+      _timezone: timezone ?? "UTC",
+      _depot_name: depotName ?? null,
+      _depot_code: depotCode ?? null,
+      _company_size: null,
+      _business_type: null,
+      _modules: null, // the in-app form has no module picker: every module is on for the trial
     });
+    if (coErr) throw coErr;
 
-    // Grant staff "admin" role so the owner can use the app and manage users
-    await admin.from("user_roles").upsert(
-      { user_id: user.id, role: "admin", organization_id: org.id },
-      { onConflict: "user_id,organization_id,role" }
-    );
-
-    // Seed subscription_modules: enable every module for the trial
-    const { data: catalog } = await admin
-      .from("modules_catalog")
-      .select("code, monthly_price");
-    if (catalog?.length) {
-      await admin.from("subscription_modules").upsert(
-        catalog.map((m: any) => ({
-          organization_id: org.id,
-          module_code: m.code,
-          price_snapshot: m.monthly_price,
-          enabled: true,
-        })),
-        { onConflict: "organization_id,module_code" }
-      );
-    }
-
-    if (depotName && depotCode) {
-      await admin.from("depots").insert({
-        organization_id: org.id,
-        name: depotName,
-        code: depotCode,
-        currency: org.currency,
-        timezone: org.timezone,
-      });
-    }
-
-    // Accounting and settings for the country: chart of accounts, taxes, fiscal year,
-    // cash/bank accounts, expense categories, dunning rules, FX rates.
-    const { error: provErr } = await admin.rpc("provision_tenant", { _org: org.id });
-    if (provErr) throw provErr;
-
-    // Make the new company the active one for this user.
-    await admin.from("profiles").update({ active_organization_id: org.id }).eq("user_id", user.id);
-
-    // Audit lifecycle events
-    await admin.rpc("log_org_event", {
-      _org_id: org.id,
-      _event_type: "org_created",
-      _details: { country, currency, timezone, depot: depotName ?? null },
-      _actor: user.id,
-    });
-    await admin.rpc("log_org_event", {
-      _org_id: org.id,
-      _event_type: "trial_started",
-      _details: { trial_ends_at: org.trial_ends_at, days: 30 },
-      _actor: user.id,
-    });
-
-    return json({ organization_id: org.id, slug: org.slug });
+    return json(result);
   } catch (e) {
     console.error(e);
     return json({ error: (e as Error).message }, 500);

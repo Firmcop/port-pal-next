@@ -10,6 +10,9 @@ import { useTranslation } from "react-i18next";
 import { EmailVerificationStatus } from "@/components/auth/EmailVerificationStatus";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
+// On once the database has the trial signup (start-trial + create_company); until then the old form.
+const TRIAL_SIGNUP = process.env.NEXT_PUBLIC_TRIAL_SIGNUP === "1";
+
 export default function Login() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
@@ -106,9 +109,16 @@ export default function Login() {
               </form>
               <div className="mt-4 text-center text-sm text-muted-foreground">
                 {isSignUp ? t("auth:have_account") : t("auth:no_account")}{" "}
-                <button onClick={() => setIsSignUp(!isSignUp)} className="text-primary font-medium hover:underline">
-                  {isSignUp ? t("auth:sign_in") : t("auth:create_workspace_link")}
-                </button>
+                {!isSignUp && TRIAL_SIGNUP ? (
+                  // New companies sign up through the trial flow (modules, details, setup).
+                  <Link to="/start" className="text-primary font-medium hover:underline">
+                    {t("auth:create_workspace_link")}
+                  </Link>
+                ) : (
+                  <button onClick={() => setIsSignUp(!isSignUp)} className="text-primary font-medium hover:underline">
+                    {isSignUp ? t("auth:sign_in") : t("auth:create_workspace_link")}
+                  </button>
+                )}
               </div>
             </>
           )}

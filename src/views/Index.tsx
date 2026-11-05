@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, ArrowLeftRight, MapPin, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
+import { WelcomeCard } from "@/components/onboarding/WelcomeCard";
 
 function KpiCard({ title, value, icon: Icon, color }: { title: string; value: string | number; icon: any; color: string }) {
   return (
@@ -61,6 +62,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <WelcomeCard />
       <div>
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">Container Depot Management System overview</p>

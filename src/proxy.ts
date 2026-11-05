@@ -12,6 +12,8 @@ import { createServerClient } from "@supabase/ssr";
 
 const PUBLIC_PREFIXES = [
   "/login",
+  "/start",
+  "/verify-email",
   "/forgot-password",
   "/reset-password",
   "/unsubscribe",

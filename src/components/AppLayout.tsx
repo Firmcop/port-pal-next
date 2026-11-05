@@ -7,6 +7,7 @@ import { WorkingDepotSwitcher } from "@/components/WorkingDepotSwitcher";
 import { usePushSubscription } from "@/hooks/use-push-subscription";
 import { TrialBanner } from "@/components/TrialBanner";
 import { FreeTierBanner } from "@/components/FreeTierBanner";
+import { EmailVerificationBanner, EmailVerificationGate } from "@/components/onboarding/EmailVerification";
 import { useAppSettingsBootstrap } from "@/hooks/use-app-settings";
 import { useWorkingDepotBootstrap } from "@/hooks/use-working-depot";
 
@@ -37,7 +38,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </header>
           <TrialBanner />
           <FreeTierBanner />
-          <main className="flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-6 min-w-0">{children}</main>
+          <EmailVerificationBanner />
+          <main className="flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-6 min-w-0">
+            <EmailVerificationGate>{children}</EmailVerificationGate>
+          </main>
         </div>
       </div>
     </SidebarProvider>

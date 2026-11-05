@@ -21,6 +21,18 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type',
 }
 
+function jwtRole(req: Request): string | null {
+  const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
+  const part = token.split('.')[1]
+  if (!part) return null
+  try {
+    const json = atob(part.replaceAll('-', '+').replaceAll('_', '/').padEnd(Math.ceil(part.length / 4) * 4, '='))
+    return (JSON.parse(json) as { role?: string }).role ?? null
+  } catch {
+    return null
+  }
+}
+
 // Generate a cryptographically random 32-byte hex token
 function generateToken(): string {
   const bytes = new Uint8Array(32)
@@ -102,6 +114,14 @@ Deno.serve(async (req) => {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
+    )
+  }
+
+  // Templates that carry a link granting something are sent by server code only.
+  if (template.serverOnly && jwtRole(req) !== 'service_role') {
+    return new Response(
+      JSON.stringify({ error: `Template '${templateName}' can only be sent by the server` }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 
