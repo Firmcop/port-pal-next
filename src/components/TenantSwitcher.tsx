@@ -5,8 +5,9 @@ import { useAuth } from "@/lib/auth";
 import {
   useOrganization,
   getStoredActiveOrgId,
-  setStoredActiveOrgId,
+  switchOrganization,
 } from "@/hooks/use-organization";
+import { toast } from "sonner";
 import {
   Select,
   SelectContent,
@@ -61,11 +62,17 @@ export function TenantSwitcher() {
     if (!pendingId && organizationId) setPendingId(organizationId);
   }, [organizationId, pendingId]);
 
-  const onChange = (id: string) => {
+  const onChange = async (id: string) => {
+    const previous = pendingId;
     setPendingId(id);
-    setStoredActiveOrgId(id);
-    // Nuke all caches so every query re-fetches under the new tenant.
-    qc.clear();
+    try {
+      await switchOrganization(id);
+      // Nuke all caches so every query re-fetches under the new tenant.
+      qc.clear();
+    } catch (e: any) {
+      setPendingId(previous);
+      toast.error(e?.message ?? "Could not switch company");
+    }
   };
 
   // Hide the switcher entirely when there's nothing to switch to.

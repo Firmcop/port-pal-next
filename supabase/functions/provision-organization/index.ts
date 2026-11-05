@@ -28,22 +28,15 @@ Deno.serve(async (req) => {
 
     const admin = createClient(url, serviceKey);
 
-    // Already a member of a real org? return existing (ignore default/legacy org)
+    // Signup creates one company per person; adding more companies is a separate flow.
     const { data: existing } = await admin
       .from("organization_members")
       .select("organization_id")
       .eq("user_id", user.id)
       .eq("status", "active")
-      .neq("organization_id", "00000000-0000-0000-0000-000000000001")
+      .limit(1)
       .maybeSingle();
     if (existing) return json({ organization_id: existing.organization_id, existing: true });
-
-    // Clean up any stale membership in the default/legacy org so the new tenant is truly isolated
-    await admin
-      .from("organization_members")
-      .delete()
-      .eq("user_id", user.id)
-      .eq("organization_id", "00000000-0000-0000-0000-000000000001");
 
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40)
       + "-" + Math.random().toString(36).slice(2, 6);
@@ -74,7 +67,7 @@ Deno.serve(async (req) => {
     // Grant staff "admin" role so the owner can use the app and manage users
     await admin.from("user_roles").upsert(
       { user_id: user.id, role: "admin", organization_id: org.id },
-      { onConflict: "user_id,role" }
+      { onConflict: "user_id,organization_id,role" }
     );
 
     // Seed subscription_modules: enable every module for the trial
@@ -102,6 +95,14 @@ Deno.serve(async (req) => {
         timezone: org.timezone,
       });
     }
+
+    // Accounting and settings for the country: chart of accounts, taxes, fiscal year,
+    // cash/bank accounts, expense categories, dunning rules, FX rates.
+    const { error: provErr } = await admin.rpc("provision_tenant", { _org: org.id });
+    if (provErr) throw provErr;
+
+    // Make the new company the active one for this user.
+    await admin.from("profiles").update({ active_organization_id: org.id }).eq("user_id", user.id);
 
     // Audit lifecycle events
     await admin.rpc("log_org_event", {

@@ -100,9 +100,6 @@ export default function Reconciliations() {
           <Button variant="outline" asChild>
             <a href="/finance/fx-rates">FX Rates</a>
           </Button>
-          <Button variant="outline" asChild>
-            <a href="/finance/adopt-legacy-data">Adopt Legacy Data</a>
-          </Button>
           <Button onClick={() => setOpen(true)}><Plus className="mr-1 h-4 w-4" />New Reconciliation</Button>
         </div>
       </div>

@@ -105,17 +105,6 @@ export default function FinanceDashboard() {
     },
   });
 
-  const { data: legacyHasData } = useQuery({
-    queryKey: ["finance-dashboard-legacy-probe", metrics?.organization_id],
-    enabled: Number(metrics?.cash_total ?? 0) === 0 && Number(metrics?.receivables_total ?? 0) === 0,
-    queryFn: async () => {
-      const { count } = await (supabase as any)
-        .from("invoices")
-        .select("*", { count: "exact", head: true })
-        .eq("organization_id", "00000000-0000-0000-0000-000000000001");
-      return (count ?? 0) > 0;
-    },
-  });
 
 
 
@@ -156,18 +145,6 @@ export default function FinanceDashboard() {
         </div>
       </div>
 
-      {legacyHasData && (
-        <Card className="border-warning/60 bg-warning/5">
-          <CardContent className="p-4 flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-warning mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm font-medium">Your dashboards are empty because real data lives in the legacy organization.</p>
-              <p className="text-xs text-muted-foreground mt-1">Move invoices, payroll, ledger entries and more into your active tenant in one click. Dry-run first to preview.</p>
-            </div>
-            <Button asChild size="sm"><Link to="/finance/adopt-legacy-data">Adopt legacy data</Link></Button>
-          </CardContent>
-        </Card>
-      )}
 
       {(missingCount > 0 || unrecordedCount > 0) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

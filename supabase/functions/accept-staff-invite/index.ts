@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
         { onConflict: "organization_id,user_id" },
       );
 
-    // Assign staff role(s) — replaces any existing staff role rows for this user
+    // Assign staff role(s) in the inviting company — roles in other companies are untouched
     const STAFF_ROLES = [
       "admin","yard_operator","gate_clerk","viewer",
       "accountant","hr_manager","production_manager","procurement_officer",
@@ -85,12 +85,13 @@ Deno.serve(async (req) => {
       .from("user_roles")
       .delete()
       .eq("user_id", user.id)
+      .eq("organization_id", inv.organization_id)
       .in("role", STAFF_ROLES);
     await admin
       .from("user_roles")
       .upsert(
         invitedRoles.map((r) => ({ user_id: user.id, role: r, organization_id: inv.organization_id })),
-        { onConflict: "user_id,role" },
+        { onConflict: "user_id,organization_id,role" },
       );
 
     // Mark accepted

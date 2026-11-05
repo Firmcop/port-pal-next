@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
       }
 
       // Assign staff roles (replace existing) — scoped to the caller's organization
-      await admin.from("user_roles").delete().eq("user_id", userId).in("role", STAFF_ROLES as any);
+      await admin.from("user_roles").delete().eq("user_id", userId).eq("organization_id", callerMember.organization_id).in("role", STAFF_ROLES as any);
       const { error: roleErr } = await admin
         .from("user_roles")
         .insert(rolesArr.map((r) => ({ user_id: userId, role: r, organization_id: callerMember.organization_id })));

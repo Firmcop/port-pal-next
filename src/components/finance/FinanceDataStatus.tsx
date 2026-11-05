@@ -8,7 +8,6 @@ import { RefreshCw, ChevronDown, AlertCircle, CheckCircle2, Loader2 } from "luci
 import { useToast } from "@/hooks/use-toast";
 import { useOrganization } from "@/hooks/use-organization";
 import {
-  LEGACY_ORG_ID,
   fetchVisibleRowCounts,
   syncFinanceData,
 } from "@/lib/finance-diagnostics";
@@ -67,23 +66,16 @@ export function FinanceDataStatus({ queryKeys }: Props) {
     if (open) diagnostics.refetch();
   };
 
-  const onLegacyOrg = org.organizationId === LEGACY_ORG_ID;
-
   return (
     <Card className="border-dashed">
       <CardContent className="py-3 space-y-3 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-muted-foreground">Active org:</span>
-            <Badge variant={onLegacyOrg ? "default" : "secondary"}>
+            <Badge variant="secondary">
               {org.organizationName ?? "—"}
             </Badge>
             <code className="text-xs text-muted-foreground">{org.organizationId ?? "—"}</code>
-            {!onLegacyOrg && (
-              <span className="text-xs text-warning">
-                Not legacy org — sign out & back in if you just switched.
-              </span>
-            )}
           </div>
           <Button size="sm" variant="outline" onClick={handleSync} disabled={syncing}>
             {syncing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <RefreshCw className="h-3 w-3 mr-1" />}

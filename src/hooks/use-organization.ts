@@ -14,7 +14,6 @@ export type OrgContext = {
   needsOnboarding: boolean;
 };
 
-const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
 const ACTIVE_ORG_STORAGE_KEY = "active_org_id";
 
 export function getStoredActiveOrgId(): string | null {
@@ -28,6 +27,19 @@ export function setStoredActiveOrgId(id: string | null) {
   else localStorage.removeItem(ACTIVE_ORG_STORAGE_KEY);
   // Notify listeners in the same tab (localStorage 'storage' events only fire cross-tab).
   window.dispatchEvent(new Event("active-org-changed"));
+}
+
+/** Switch company: the database is told first (it decides what is read and written), then the UI. */
+export async function switchOrganization(id: string) {
+  const { error } = await (supabase as any).rpc("set_active_organization", { _org: id });
+  // A database without the function (before the Phase 0 migration) keeps the old,
+  // screen-only switch instead of blocking it.
+  if (error && !isMissingFunction(error)) throw error;
+  setStoredActiveOrgId(id);
+}
+
+function isMissingFunction(error: { code?: string; message?: string }) {
+  return error.code === "PGRST202" || /could not find the function/i.test(error.message ?? "");
 }
 
 export function useOrganization(): OrgContext {
@@ -62,7 +74,7 @@ export function useOrganization(): OrgContext {
       return;
     }
     (async () => {
-      const [{ data: memberships }, { data: pa }] = await Promise.all([
+      const [{ data: memberships }, { data: pa }, { data: profile }] = await Promise.all([
         supabase
           .from("organization_members")
           .select("organization_id, role, organizations(id, name, status, trial_ends_at, country)")
@@ -70,10 +82,13 @@ export function useOrganization(): OrgContext {
           .eq("status", "active")
           .order("created_at", { ascending: true }),
         supabase.from("platform_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
+        (supabase as any).from("profiles").select("active_organization_id").eq("user_id", user.id).maybeSingle(),
       ]);
 
       const isPlatformAdmin = !!pa;
-      const storedId = getStoredActiveOrgId();
+      // This browser's choice first, then the choice saved on the profile (other devices).
+      const serverActiveId: string | null = (profile as any)?.active_organization_id ?? null;
+      const storedId = getStoredActiveOrgId() ?? serverActiveId;
 
       // Resolve which membership (if any) matches the stored active org.
       let member = (memberships ?? [])[0] as any;
@@ -100,6 +115,12 @@ export function useOrganization(): OrgContext {
         }
       }
 
+      // Keep the database on the same company the screen shows: it scopes every read and write.
+      if (organizationId && organizationId !== serverActiveId) {
+        const { error } = await (supabase as any).rpc("set_active_organization", { _org: organizationId });
+        if (error && !isMissingFunction(error)) console.error("Could not set active company", error);
+      }
+
       // Apply org-locale language only if user hasn't explicitly chosen one.
       if (org?.country && !localStorage.getItem("app_lang")) {
         applyLanguage(resolveLanguageFromCountry(org.country));
@@ -112,7 +133,7 @@ export function useOrganization(): OrgContext {
         trialEndsAt: org?.trial_ends_at ?? null,
         role: (member as any)?.role ?? (isPlatformAdmin ? "platform_admin" : null),
         isPlatformAdmin,
-        needsOnboarding: !isPlatformAdmin && (!member || organizationId === DEFAULT_ORG_ID),
+        needsOnboarding: !isPlatformAdmin && !member,
       });
     })();
   }, [user, authLoading, tick]);

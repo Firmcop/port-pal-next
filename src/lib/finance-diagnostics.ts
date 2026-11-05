@@ -1,8 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export const LEGACY_ORG_ID = "00000000-0000-0000-0000-000000000001";
-
 export const FINANCE_QUERY_KEYS = ["account-balances", "ar-aging-data", "ap-aging-data"] as const;
 
 export async function syncFinanceData(queryClient: QueryClient) {
