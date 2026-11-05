@@ -3,9 +3,10 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "./config";
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
+const URL = SUPABASE_URL;
+const KEY = SUPABASE_PUBLISHABLE_KEY;
 
 /**
  * Supabase client for Server Components, Server Actions and Route Handlers,

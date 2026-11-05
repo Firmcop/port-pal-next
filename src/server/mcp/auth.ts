@@ -1,4 +1,5 @@
 import "server-only";
+import { SUPABASE_URL } from "@/integrations/supabase/config";
 
 /** OAuth 2.1 metadata for the MCP endpoint. Supabase Auth is the authorization server. */
 
@@ -17,8 +18,7 @@ export function siteOrigin(request: Request) {
 
 export function authorizationServer() {
   // Must be the direct Supabase host (not a proxy) so issuer checks in AI clients match the token's `iss`.
-  const ref = process.env.NEXT_PUBLIC_SUPABASE_PROJECT_ID;
-  return ref ? `https://${ref}.supabase.co/auth/v1` : `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1`;
+  return `${SUPABASE_URL}/auth/v1`;
 }
 
 export function protectedResourceMetadata(request: Request) {

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "@/integrations/supabase/config";
 
 type State = "loading" | "valid" | "already" | "invalid" | "submitting" | "done" | "error";
 
@@ -18,8 +19,8 @@ export default function Unsubscribe() {
       setState("invalid");
       return;
     }
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-    const anon = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY as string;
+    const supabaseUrl = SUPABASE_URL;
+    const anon = SUPABASE_PUBLISHABLE_KEY;
     fetch(
       `${supabaseUrl}/functions/v1/handle-email-unsubscribe?token=${encodeURIComponent(token)}`,
       { headers: { apikey: anon } }
