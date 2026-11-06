@@ -42,7 +42,8 @@ export async function acquireContainerFromOwner(
     {
       _container_id: args.containerId,
       _amount: Number(args.amount),
-      _currency: args.currency || "USD",
+      // Blank = the company currency, decided on the server (never assume USD).
+      _currency: args.currency || null,
       _reason: args.reason,
       _reference: args.reference,
       _expected_owner: args.expectedOwner ?? null,

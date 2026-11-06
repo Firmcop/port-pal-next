@@ -267,7 +267,7 @@ export default function ConversionDetail() {
           const poId = await acquireContainerFromOwner({
             containerId: row.container_id,
             amount: row.amount,
-            currency: (j as any)?.currency || getDefaultCurrency(),
+            currency: (j as any)?.currency || undefined,
             reason: "conversion",
             reference: (j as any)?.job_number || id!,
           });

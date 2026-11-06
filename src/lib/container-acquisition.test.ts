@@ -130,7 +130,7 @@ describe("acquireContainerFromOwner — invariants", () => {
     ).rejects.toMatchObject({ message: "boom" });
   });
 
-  it("defaults currency to USD when blank", async () => {
+  it("leaves a blank currency to the server (company currency)", async () => {
     rpcMock.mockResolvedValueOnce({ data: "po", error: null });
     await acquireContainerFromOwner({
       containerId: "c-1",
@@ -139,7 +139,7 @@ describe("acquireContainerFromOwner — invariants", () => {
       reason: "sale",
       reference: "X",
     });
-    expect(rpcMock.mock.calls[0][1]._currency).toBe("USD");
+    expect(rpcMock.mock.calls[0][1]._currency).toBeNull();
   });
 });
 
