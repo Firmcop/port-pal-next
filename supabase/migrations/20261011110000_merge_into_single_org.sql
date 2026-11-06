@@ -77,6 +77,13 @@ BEGIN
                     AND t.currency_to = s.currency_to AND t.as_of_date = s.as_of_date);
   DELETE FROM public.trucks_drivers s WHERE s.organization_id = ANY(_sources)
      AND EXISTS (SELECT 1 FROM public.trucks_drivers t WHERE t.organization_id = _target AND t.truck_plate = s.truck_plate);
+  -- Document-number counters: keep the higher count so no number is reused.
+  UPDATE public.conversion_number_sequences t SET last_seq = s.last_seq, updated_at = now()
+    FROM (SELECT slug, max(last_seq) AS last_seq FROM public.conversion_number_sequences
+           WHERE organization_id = ANY(_sources) GROUP BY slug) s
+   WHERE t.organization_id = _target AND t.slug = s.slug AND s.last_seq > t.last_seq;
+  DELETE FROM public.conversion_number_sequences s WHERE s.organization_id = ANY(_sources)
+     AND EXISTS (SELECT 1 FROM public.conversion_number_sequences t WHERE t.organization_id = _target AND t.slug = s.slug);
   UPDATE public.depots SET is_hq = false WHERE organization_id = ANY(_sources) AND is_hq;
   -- Roles and permission overrides are not carried over (none exist today).
   DELETE FROM public.user_roles                WHERE organization_id = ANY(_sources);

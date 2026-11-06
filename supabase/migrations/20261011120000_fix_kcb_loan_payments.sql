@@ -6,8 +6,9 @@
 --    instalment reference). The first set is removed: its ledger lines are
 --    reversed on the same date (the audit trail stays), the payment rows are
 --    deleted and the schedule is re-applied.
--- 2. The 7 Oct 2026 payment on AA241859QRT8 had no bank account; it is set
---    to KCB KES, the account every other KCB loan payment uses.
+-- 2. The 7 Oct and 4 Nov 2026 instalment payments on AA241859QRT8 had no
+--    bank account; they are set to KCB KES, the account every other KCB loan
+--    payment uses.
 -- 3. The bank-side lines of the loan payments had no GL account because
 --    they were posted in an organisation without account 1000; they now
 --    use 1000 Cash on Hand like every other bank line.
@@ -24,7 +25,9 @@ DECLARE
                                  '36849eb4-4aa2-4b6d-bb08-ae8d037aee5b',   -- #20 interest
                                  '41b0009b-669d-44c2-86d0-76ae13bb70b4']::uuid[]; -- #20 principal
   _oct  constant uuid[] := ARRAY['1b752012-6571-4bb0-af04-26a27594d062',
-                                 '6e78088c-cfcd-465c-b6c7-79db31c79b1f']::uuid[];
+                                 '6e78088c-cfcd-465c-b6c7-79db31c79b1f',
+                                 '768bb25e-a626-4c64-a145-9f6e9020f579',   -- 4 Nov principal
+                                 '60a9e5c2-d671-4466-983a-5b1873866c0c']::uuid[]; -- 4 Nov interest
   _cash uuid;
   _id uuid;
   _on timestamptz;
@@ -34,7 +37,7 @@ BEGIN
   END IF;
   SELECT id INTO _cash FROM public.gl_accounts WHERE organization_id = _org AND code = '1000';
 
-  -- 2. bank account for the 7 Oct payment
+  -- 2. bank account for the 7 Oct and 4 Nov payments
   UPDATE public.loan_transactions SET financial_account_id = _kcb
    WHERE id = ANY(_oct) AND financial_account_id IS NULL;
   UPDATE public.accounting_transactions SET financial_account_id = _kcb
