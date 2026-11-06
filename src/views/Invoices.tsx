@@ -1,5 +1,6 @@
 import { getOrgCurrency, getPrintDepot } from "@/lib/app-settings";
 import { roundMoney, assertTotalsMatch, formatMoneyCode } from "@/lib/money";
+import { computeVat, VAT_MODE_LABELS, type VatMode } from "@/lib/vat";
 import { formatAccountTypeLabel } from "@/lib/format";
 import { useUserStaffRole } from "@/hooks/use-user-staff-role";
 import { CurrencyOverrideDialog } from "@/components/finance/CurrencyOverrideDialog";
@@ -167,10 +168,8 @@ export default function Invoices() {
         throw new Error("Container sale / conversion project invoices must have at least one linked container.");
       }
       const currency = form.currency;
-      const subtotal = roundMoney(parseFloat(form.subtotal || 0), currency);
-      const taxRate = parseFloat(form.tax_rate || 0);
-      const taxAmount = roundMoney(subtotal * (taxRate / 100), currency);
-      const totalAmount = roundMoney(subtotal + taxAmount, currency);
+      const { subtotal, taxRate, taxAmount, total: totalAmount } =
+        computeVat(parseFloat(form.subtotal || 0), (form.vat_mode as VatMode) || "none", currency);
       assertTotalsMatch({ subtotal, taxAmount, total: totalAmount }, currency);
       const payload = {
         invoice_number: generateInvoiceNumber(),
@@ -224,7 +223,7 @@ export default function Invoices() {
 
   // Auto-generate storage invoice
   const generateStorageInvoice = useMutation({
-    mutationFn: async ({ containerId, taxRate }: { containerId: string; taxRate: number }) => {
+    mutationFn: async ({ containerId, vatMode }: { containerId: string; vatMode: VatMode }) => {
       const container = containers?.find((c) => c.id === containerId);
       if (!container || !container.gate_in_at) throw new Error("Container not found or no gate-in date");
 
@@ -238,9 +237,8 @@ export default function Invoices() {
       const dwellDays = differenceInDays(new Date(), new Date(container.gate_in_at));
       const billableDays = Math.max(0, dwellDays - Number(tariff.free_days));
       const currency = tariff.currency;
-      const subtotal = roundMoney(billableDays * Number(tariff.rate_per_day), currency);
-      const taxAmount = roundMoney(subtotal * (taxRate / 100), currency);
-      const totalAmount = roundMoney(subtotal + taxAmount, currency);
+      const { subtotal, taxRate, taxAmount, total: totalAmount } =
+        computeVat(billableDays * Number(tariff.rate_per_day), vatMode, currency);
       assertTotalsMatch({ subtotal, taxAmount, total: totalAmount }, currency);
 
       const { data: inv, error } = await supabase.from("invoices").insert({
@@ -439,7 +437,7 @@ export default function Invoices() {
   const [form, setForm] = useState<any>({
     customer_pick: "", customer_name: "", customer_reference: "", container_ids: [] as string[], invoice_type: "storage",
     is_container_billing: false,
-    line_description: "", quantity: "1", unit_price: "", subtotal: "", tax_rate: "21", currency: getOrgCurrency(), notes: "",
+    line_description: "", quantity: "1", unit_price: "", subtotal: "", vat_mode: "none", currency: getOrgCurrency(), notes: "",
   });
   const containerBillingInvalid = form.is_container_billing && (form.container_ids as string[]).length === 0;
 
@@ -450,7 +448,7 @@ export default function Invoices() {
   });
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
 
-  const [storageForm, setStorageForm] = useState({ container_id: "", tax_rate: "21" });
+  const [storageForm, setStorageForm] = useState<{ container_id: string; vat_mode: VatMode }>({ container_id: "", vat_mode: "none" });
 
   const outstandingByCurrency = (invoices ?? [])
     .filter((i: any) => i.status === "sent" || i.status === "overdue")
@@ -505,13 +503,18 @@ export default function Invoices() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Tax Rate (%)</Label>
-                  <Input type="number" step="0.1" value={storageForm.tax_rate} onChange={(e) => setStorageForm((f) => ({ ...f, tax_rate: e.target.value }))} />
+                  <Label>VAT</Label>
+                  <Select value={storageForm.vat_mode} onValueChange={(v) => setStorageForm((f) => ({ ...f, vat_mode: v as VatMode }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(VAT_MODE_LABELS) as VatMode[]).map((m) => <SelectItem key={m} value={m}>{VAT_MODE_LABELS[m]}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button
                   className="w-full"
                   disabled={!storageForm.container_id || generateStorageInvoice.isPending}
-                  onClick={() => generateStorageInvoice.mutate({ containerId: storageForm.container_id, taxRate: parseFloat(storageForm.tax_rate) })}
+                  onClick={() => generateStorageInvoice.mutate({ containerId: storageForm.container_id, vatMode: storageForm.vat_mode })}
                 >
                   Generate Invoice
                 </Button>
@@ -648,12 +651,17 @@ export default function Invoices() {
                     <Input type="number" step="0.01" value={form.unit_price} onChange={(e) => set("unit_price", e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Subtotal</Label>
+                    <Label>Amount</Label>
                     <Input type="number" step="0.01" value={form.subtotal} onChange={(e) => set("subtotal", e.target.value)} required />
                   </div>
                   <div className="space-y-2">
-                    <Label>Tax %</Label>
-                    <Input type="number" step="0.1" value={form.tax_rate} onChange={(e) => set("tax_rate", e.target.value)} />
+                    <Label>VAT</Label>
+                    <Select value={form.vat_mode} onValueChange={(v) => set("vat_mode", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(VAT_MODE_LABELS) as VatMode[]).map((m) => <SelectItem key={m} value={m}>{VAT_MODE_LABELS[m]}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                   </div>
                 </div>
                 <div className="space-y-2">
