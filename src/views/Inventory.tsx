@@ -145,11 +145,11 @@ function useYardBlocks() {
 export default function Inventory() {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  // "active" = in the yard (sold, converted and on-lease hidden); "all" = every status.
+  const [statusFilter, setStatusFilter] = useState<string>("active");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [shippingLineFilter, setShippingLineFilter] = useState<string>("all");
   const [heightFilter, setHeightFilter] = useState<string>("all");
-  const [includeRetired, setIncludeRetired] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [acqReview, setAcqReview] = useState<{ containerId: string; containerNumber: string } | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -174,21 +174,28 @@ export default function Inventory() {
 
 
   const { data: containers, isLoading } = useQuery({
-    queryKey: ["containers", search, statusFilter, ownerFilter, shippingLineFilter, heightFilter, includeRetired],
+    queryKey: ["containers", search, statusFilter, ownerFilter, shippingLineFilter, heightFilter],
     queryFn: async () => {
-      let q = supabase.from("containers").select("*, yard_blocks(name), depots!containers_depot_id_fkey(name), pickup_depot:depots!containers_pickup_depot_id_fkey(name)").order("created_at", { ascending: false });
-      if (search) q = q.ilike("container_number", `%${search}%`);
-      if (statusFilter !== "all") {
-        q = q.eq("status", statusFilter as any);
-      } else if (!includeRetired) {
-        q = q.not("status", "in", `(${RETIRED_STATUSES.join(",")})`);
+      // Fetch every matching container, 1,000 rows per request (no display cap).
+      const pageSize = 1000;
+      const all: any[] = [];
+      for (let from = 0; ; from += pageSize) {
+        let q = supabase.from("containers").select("*, yard_blocks(name), depots!containers_depot_id_fkey(name), pickup_depot:depots!containers_pickup_depot_id_fkey(name)").order("created_at", { ascending: false });
+        if (search) q = q.ilike("container_number", `%${search}%`);
+        if (statusFilter === "active") {
+          q = q.not("status", "in", `(${RETIRED_STATUSES.join(",")})`);
+        } else if (statusFilter !== "all") {
+          q = q.eq("status", statusFilter as any);
+        }
+        if (ownerFilter !== "all") q = q.eq("owner", ownerFilter);
+        if (shippingLineFilter !== "all") q = q.eq("shipping_line", shippingLineFilter);
+        if (heightFilter !== "all") q = q.eq("height_class", heightFilter as any);
+        const { data, error } = await q.range(from, from + pageSize - 1);
+        if (error) throw error;
+        all.push(...(data ?? []));
+        if (!data || data.length < pageSize) break;
       }
-      if (ownerFilter !== "all") q = q.eq("owner", ownerFilter);
-      if (shippingLineFilter !== "all") q = q.eq("shipping_line", shippingLineFilter);
-      if (heightFilter !== "all") q = q.eq("height_class", heightFilter as any);
-      const { data, error } = await q.limit(100);
-      if (error) throw error;
-      return data;
+      return all;
     },
   });
 
@@ -638,9 +645,10 @@ export default function Inventory() {
               <Input placeholder="Search container number..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">In yard (active)</SelectItem>
+                <SelectItem value="all">All statuses</SelectItem>
                 <SelectItem value="available">Available</SelectItem>
                 <SelectItem value="allocated">Allocated</SelectItem>
                 <SelectItem value="damaged">Damaged</SelectItem>
@@ -680,15 +688,6 @@ export default function Inventory() {
                 <SelectItem value="LC">LC (Low Cube)</SelectItem>
               </SelectContent>
             </Select>
-            <label className="flex items-center gap-2 text-xs text-muted-foreground whitespace-nowrap px-2">
-              <input
-                type="checkbox"
-                checked={includeRetired}
-                onChange={(e) => setIncludeRetired(e.target.checked)}
-                className="h-3.5 w-3.5"
-              />
-              Include retired
-            </label>
           </div>
         </CardHeader>
         <CardContent className="p-0">

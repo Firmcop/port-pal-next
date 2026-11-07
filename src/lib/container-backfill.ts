@@ -26,19 +26,21 @@ export async function fetchContainerRecordStatus(
   const ids = containers.map((c) => c.id);
   const numbers = containers.map((c) => c.container_number);
 
+  // Ask in batches so long lists never exceed the request URL limit.
+  const BATCH = 150;
+  const batches = <T,>(xs: T[]) => Array.from({ length: Math.ceil(xs.length / BATCH) }, (_, i) => xs.slice(i * BATCH, (i + 1) * BATCH));
+  const collect = async (run: (part: string[]) => PromiseLike<{ data: any[] | null }>, list: string[]) =>
+    ({ data: (await Promise.all(batches(list).map(run))).flatMap((r) => r.data ?? []) });
+
   const [appts, eirs, pinvs, svcInvs] = await Promise.all([
-    supabase.from("gate_appointments").select("container_number").in("container_number", numbers),
-    supabase.from("eir_records").select("container_id").in("container_id", ids).eq("eir_type", "gate_in"),
-    supabase
-      .from("supplier_invoices")
-      .select("reference")
-      .eq("reason", "purchase")
-      .in("reference", numbers),
-    supabase
+    collect((part) => supabase.from("gate_appointments").select("container_number").in("container_number", part), numbers),
+    collect((part) => supabase.from("eir_records").select("container_id").in("container_id", part).eq("eir_type", "gate_in"), ids),
+    collect((part) => supabase.from("supplier_invoices").select("reference").eq("reason", "purchase").in("reference", part), numbers),
+    collect((part) => supabase
       .from("supplier_invoices")
       .select("container_id, reason")
-      .in("container_id", ids)
-      .in("reason", ["acquisition_transport", "acquisition_crane_offloading"]),
+      .in("container_id", part)
+      .in("reason", ["acquisition_transport", "acquisition_crane_offloading"]), ids),
   ]);
 
   const apptSet = new Set((appts.data ?? []).map((r: any) => r.container_number));
