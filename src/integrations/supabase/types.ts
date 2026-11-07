@@ -1669,6 +1669,7 @@ export type Database = {
       }
       container_conversions: {
         Row: {
+          product_name: string | null
           actual_cost: number | null
           assembly_type: Database["public"]["Enums"]["assembly_type"] | null
           budget_amount: number
@@ -1706,6 +1707,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          product_name?: string | null
           actual_cost?: number | null
           assembly_type?: Database["public"]["Enums"]["assembly_type"] | null
           budget_amount?: number
@@ -1743,6 +1745,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          product_name?: string | null
           actual_cost?: number | null
           assembly_type?: Database["public"]["Enums"]["assembly_type"] | null
           budget_amount?: number
@@ -4201,6 +4204,8 @@ export type Database = {
       }
       eir_records: {
         Row: {
+          product_name: string | null
+          source_containers: string | null
           acquisition_supplier: string | null
           appointment_id: string | null
           approval_request_id: string | null
@@ -4256,6 +4261,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          product_name?: string | null
+          source_containers?: string | null
           acquisition_supplier?: string | null
           appointment_id?: string | null
           approval_request_id?: string | null
@@ -4311,6 +4318,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          product_name?: string | null
+          source_containers?: string | null
           acquisition_supplier?: string | null
           appointment_id?: string | null
           approval_request_id?: string | null
@@ -9460,6 +9469,7 @@ export type Database = {
       }
       organizations: {
         Row: {
+          legal_name: string | null
           billing_address: Json | null
           billing_email: string | null
           config: Json
@@ -9481,6 +9491,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          legal_name?: string | null
           billing_address?: Json | null
           billing_email?: string | null
           config?: Json
@@ -9502,6 +9513,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          legal_name?: string | null
           billing_address?: Json | null
           billing_email?: string | null
           config?: Json

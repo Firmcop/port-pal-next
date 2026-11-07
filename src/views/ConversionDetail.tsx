@@ -511,6 +511,9 @@ function OverviewTab({ job, onChanged }: { job: any; onChanged: () => void }) {
         <div><span className="text-muted-foreground">Customer</span><p className="font-medium">{job.customers?.company_name ?? "—"}</p></div>
         <div><span className="text-muted-foreground">Container</span><p className="font-medium">{job.containers?.container_number} ({job.containers?.size}' {job.containers?.category})</p></div>
         <div><span className="text-muted-foreground">Product Type</span><p className="font-medium capitalize">{job.product_type?.replace("_", " ")}</p></div>
+        {job.job_kind !== "sub_assembly" && (
+          <ProductNameField job={job} canEdit={job.status !== "cancelled"} onSaved={onChanged} />
+        )}
         <div><span className="text-muted-foreground">Status</span><p className="font-medium capitalize">{job.status?.replace("_", " ")}</p></div>
         <div><span className="text-muted-foreground">Start Date</span><p className="font-medium">{job.start_date ? format(new Date(job.start_date), "dd MMM yyyy") : "—"}</p></div>
         <div><span className="text-muted-foreground">End Date</span><p className="font-medium">{job.end_date ? format(new Date(job.end_date), "dd MMM yyyy") : "—"}</p></div>
@@ -550,6 +553,44 @@ function OverviewTab({ job, onChanged }: { job: any; onChanged: () => void }) {
         }}
       />
     </Card>
+  );
+}
+
+/** Short product name printed on gate-out EIRs (with the source container numbers). */
+function ProductNameField({ job, canEdit, onSaved }: { job: any; canEdit: boolean; onSaved: () => void }) {
+  const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState<string>(job.product_name ?? "");
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("container_conversions")
+        .update({ product_name: value.trim() || null } as any).eq("id", job.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { setEditing(false); onSaved(); toast({ title: "Product name saved" }); },
+    onError: (e: any) => toast({ title: "Could not save", description: e.message, variant: "destructive" }),
+  });
+  return (
+    <div>
+      <span className="text-muted-foreground">Product name</span>
+      {editing ? (
+        <div className="flex gap-2 mt-1">
+          <Input value={value} maxLength={80} onChange={(e) => setValue(e.target.value)}
+            placeholder="e.g. 2-Bedroom Container House" className="h-8" />
+          <Button size="sm" className="h-8" onClick={() => save.mutate()} disabled={save.isPending}>Save</Button>
+          <Button size="sm" variant="ghost" className="h-8" onClick={() => { setValue(job.product_name ?? ""); setEditing(false); }}>Cancel</Button>
+        </div>
+      ) : (
+        <p className="font-medium">
+          {job.product_name || <span className="text-muted-foreground font-normal">Not set</span>}
+          {canEdit && (
+            <button type="button" className="ml-2 text-xs text-primary hover:underline" onClick={() => setEditing(true)}>
+              {job.product_name ? "Edit" : "Add"}
+            </button>
+          )}
+        </p>
+      )}
+    </div>
   );
 }
 

@@ -60,6 +60,9 @@ export interface EirPrintData {
   // Ownership frozen on the EIR record at issue time (depot for depot-owned units).
   owner_at_issue?: string | null;
   new_owner?: string | null;
+  /** Product released (converted units) and the container(s) it was made from. */
+  product_name?: string | null;
+  source_containers?: string | null;
   acquisition_supplier?: string | null;
   // Actual purchase price of the unit and the reference (standard) rate for its
   // size, frozen on the gate-in EIR.
@@ -233,6 +236,18 @@ function headerBlock(d: EirPrintData, qr: string, barcode: string, showDepot = t
   `;
 }
 
+/** "Product | 2-Bedroom Container House | Made from | TGHU 8339174 + WHLU5591123" for converted units. */
+function productRow(d: EirPrintData, valueSpan: number) {
+  if (!d.product_name) return "";
+  const half = Math.max(1, Math.floor((valueSpan - 1) / 2));
+  return `<tr>
+        <td class="label">Product</td>
+        <td colspan="${half}" style="font-weight:bold;">${v(d.product_name)}</td>
+        <td class="label">Made from</td>
+        <td colspan="${valueSpan - 1 - half}" style="font-family:monospace;">${v(d.source_containers)}</td>
+      </tr>`;
+}
+
 function containerSection(d: EirPrintData) {
   const c = d.container;
   return `
@@ -246,10 +261,11 @@ function containerSection(d: EirPrintData) {
         <td class="label" style="width:12%;">Type</td>
         <td>${v(c?.iso_type)}</td>
       </tr>
+      ${productRow(d, 5)}
       <tr>
         <td class="label">Category</td>
         <td>${v(c?.category)}</td>
-        <td class="label">Owner</td>
+        <td class="label">${d.eir_type === "gate_out" ? "Previous Owner" : "Owner"}</td>
         <td>${v(c?.owner)}</td>
         <td class="label">Shipping Line</td>
         <td>${v(c?.shipping_line)}</td>
@@ -404,7 +420,7 @@ function buyerSection(d: EirPrintData) {
       <tr>
         <td class="label">${b.kra_pin ? "KRA PIN" : "Tax ID"}</td>
         <td>${v(taxLine)}</td>
-        <td class="label">Original Owner</td>
+        <td class="label">Previous Owner</td>
         <td>${v(b.original_owner)}</td>
       </tr>
       ${b.acquisition_supplier ? `<tr><td class="label">Acquired From</td><td colspan="3">${v(b.acquisition_supplier)}</td></tr>` : ""}
@@ -576,6 +592,7 @@ function compactTemplate(d: EirPrintData, qr: string, barcode: string, hash: str
           <td class="label">Type</td><td>${v(c?.iso_type)}</td>
           <td class="label">Category</td><td>${v(c?.category)}</td>
         </tr>
+        ${productRow(d, 5)}
         <tr>
           <td class="label">Cargo</td><td>${d.cargo_status.toUpperCase()}</td>
           <td class="label">Seal</td><td>${v(d.seal_number)}</td>
@@ -594,7 +611,7 @@ function compactTemplate(d: EirPrintData, qr: string, barcode: string, hash: str
         ${d.buyer?.name ? `<tr>
           <td class="label">${d.buyer.label ?? "Buyer"}</td><td style="font-weight:bold;">${v(d.buyer.name)}</td>
           <td class="label">Contact</td><td>${v(d.buyer.contact)}</td>
-          <td class="label">Orig. Owner</td><td>${v(d.buyer.original_owner)}</td>
+          <td class="label">Prev. Owner</td><td>${v(d.buyer.original_owner)}</td>
         </tr>` : ""}
       </table>
       <table><tr><td class="label" style="width:12%;">Remarks</td><td style="min-height:25px;">${v(d.damage_description)} ${d.inspector_notes ? " | " + d.inspector_notes : ""}</td></tr></table>
@@ -679,6 +696,8 @@ function minimalTemplate(d: EirPrintData, qr: string, barcode: string, hash: str
       <div class="line"><span class="lbl">EIR Number:</span><span>${d.eir_number}</span></div>
       <div class="line"><span class="lbl">Date:</span><span>${dateStr(d.completed_at ?? d.created_at)}</span></div>
       <div class="line"><span class="lbl">Container:</span><span>${v(c?.container_number)}</span></div>
+      ${d.product_name ? `<div class="line"><span class="lbl">Product:</span><span style="font-weight:bold;">${v(d.product_name)}</span></div>
+      <div class="line"><span class="lbl">Made from:</span><span>${v(d.source_containers)}</span></div>` : ""}
       <div class="line"><span class="lbl">Size / Type:</span><span>${v(c?.size)}ft / ${v(c?.iso_type)}</span></div>
       <div class="line"><span class="lbl">Category:</span><span>${v(c?.category)}</span></div>
       <div class="line"><span class="lbl">Cargo Status:</span><span>${d.cargo_status.toUpperCase()}</span></div>
@@ -690,7 +709,7 @@ function minimalTemplate(d: EirPrintData, qr: string, barcode: string, hash: str
       ${d.buyer?.name ? `
       <div class="line"><span class="lbl">${d.buyer.label ?? "Buyer"}:</span><span style="font-weight:bold;">${v(d.buyer.name)}</span></div>
       ${d.buyer.contact ? `<div class="line"><span class="lbl">${d.buyer.label ?? "Buyer"} Contact:</span><span>${v(d.buyer.contact)}</span></div>` : ""}
-      ${d.buyer.original_owner ? `<div class="line"><span class="lbl">Original Owner:</span><span>${v(d.buyer.original_owner)}</span></div>` : ""}
+      ${d.buyer.original_owner ? `<div class="line"><span class="lbl">Previous Owner:</span><span>${v(d.buyer.original_owner)}</span></div>` : ""}
       ` : ""}
       <div class="sep"></div>
       <div class="line"><span class="lbl">Vehicle:</span><span>${v(a?.truck_plate)}</span></div>
@@ -825,7 +844,7 @@ export async function generateEirPrint(data: EirPrintData, template: EirTemplate
     condition: printData.condition_grade,
     status: printData.container?.status ?? "",
     statement: printData.release_purpose
-      ? `This container was released to ${printData.appointment?.shipping_line ?? printData.container?.owner ?? "N/A"} as ${releasePurposeLabel(printData.release_purpose)}`
+      ? `This ${printData.product_name ? "unit" : "container"} was released to ${printData.new_owner ?? printData.appointment?.shipping_line ?? printData.container?.owner ?? "N/A"} as ${releasePurposeLabel(printData.release_purpose)}`
       : `Container ${printData.eir_type === "gate_in" ? "received" : "released"} — ${printData.eir_number}`,
   });
   const qrDataUrl = await generateQrDataUrl(qrPayload);

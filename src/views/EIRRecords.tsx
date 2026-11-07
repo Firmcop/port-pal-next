@@ -782,7 +782,7 @@ export default function EIRRecords() {
         .maybeSingle();
       if (linkedSale?.buyer_name) {
         buyer = {
-          label: r.release_purpose === "lease_unit" ? "Lessee" : "Buyer",
+          label: r.release_purpose === "lease_unit" ? "Lessee" : "Buyer (New Owner)",
           name: r.new_owner || linkedSale.buyer_name,
           contact: linkedSale.buyer_contact,
           // Ownership is resolved and frozen on the EIR record itself.
@@ -795,7 +795,7 @@ export default function EIRRecords() {
         const c = buyerCustomers?.find((b) => b.id === sessionBuyerId);
         if (c) {
           buyer = {
-            label: r.release_purpose === "lease_unit" ? "Lessee" : "Buyer",
+            label: r.release_purpose === "lease_unit" ? "Lessee" : "Buyer (New Owner)",
             name: r.new_owner || c.company_name,
             contact: c.phone || c.email,
             kra_pin: c.kra_pin,
@@ -811,7 +811,7 @@ export default function EIRRecords() {
           (b) => (b.company_name ?? "").trim().toLowerCase() === String(r.new_owner).trim().toLowerCase()
         );
         buyer = {
-          label: r.release_purpose === "lease_unit" ? "Lessee" : "Buyer",
+          label: r.release_purpose === "lease_unit" ? "Lessee" : "Buyer (New Owner)",
           name: r.new_owner,
           contact: c ? (c.phone || c.email) : undefined,
           kra_pin: c?.kra_pin ?? undefined,
@@ -893,6 +893,8 @@ export default function EIRRecords() {
       lease,
       owner_at_issue: r.owner_at_issue ?? null,
       new_owner: r.new_owner ?? null,
+      product_name: r.product_name ?? null,
+      source_containers: r.source_containers ?? null,
       acquisition_supplier: r.acquisition_supplier ?? null,
       purchase_price_snapshot: r.purchase_price_snapshot ?? null,
       reference_rate: r.reference_rate ?? null,
@@ -1390,7 +1392,12 @@ export default function EIRRecords() {
                     <TableRow key={r.id}>
                       <TableCell className="font-mono text-sm font-medium">{r.eir_number}</TableCell>
                       <TableCell className="capitalize">{r.eir_type.replace("_", " ")}</TableCell>
-                      <TableCell className="font-mono text-sm">{r.containers?.container_number ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {r.containers?.container_number ?? "—"}
+                        {r.product_name && (
+                          <div className="font-sans text-xs text-muted-foreground">{r.product_name}</div>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={gradeColors[r.condition_grade] ?? ""}>
                           {r.condition_grade}

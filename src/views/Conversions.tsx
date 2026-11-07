@@ -159,6 +159,7 @@ export default function Conversions() {
     product_type: "office" as typeof PRODUCT_TYPES[number],
     assembly_type: "door" as typeof ASSEMBLY_TYPES[number],
     description: "",
+    product_name: "",
     quoted_price: "",
     budget_amount: "",
     container_cost: "",
@@ -170,7 +171,7 @@ export default function Conversions() {
   });
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
   const { data: acq } = useContainerAcquisition(form.container_id || null);
-  const resetForm = () => setForm({ job_kind: "product", container_id: "", customer_id: "", product_type: "office", assembly_type: "door", description: "", quoted_price: "", budget_amount: "", container_cost: "", transport_offloading_cost: "", qty_produced: "1", unit_of_measure: "pcs", start_date: "", end_date: "" });
+  const resetForm = () => setForm({ job_kind: "product", container_id: "", customer_id: "", product_type: "office", assembly_type: "door", description: "", product_name: "", quoted_price: "", budget_amount: "", container_cost: "", transport_offloading_cost: "", qty_produced: "1", unit_of_measure: "pcs", start_date: "", end_date: "" });
 
 
   const createMut = useMutation({
@@ -182,6 +183,7 @@ export default function Conversions() {
         customer_id: form.customer_id || null,
         product_type: form.product_type,
         description: form.description,
+        product_name: form.job_kind === "sub_assembly" ? null : (form.product_name.trim() || null),
         quoted_price: parseFloat(form.quoted_price) || 0,
         budget_amount: parseFloat(form.budget_amount) || 0,
         container_cost: Number(acq?.purchase ?? 0),
@@ -319,6 +321,19 @@ export default function Conversions() {
                       <SelectContent>{customers?.map((c) => <SelectItem key={c.id} value={c.id}>{c.company_name}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
+                </div>
+              )}
+
+              {form.job_kind !== "sub_assembly" && (
+                <div className="space-y-2">
+                  <Label>Product name</Label>
+                  <Input
+                    value={form.product_name}
+                    onChange={(e) => set("product_name", e.target.value)}
+                    placeholder={form.job_kind === "split" ? "e.g. 20ft split container" : "e.g. 2-Bedroom Container House"}
+                    maxLength={80}
+                  />
+                  <p className="text-xs text-muted-foreground">Printed on the gate-out EIR with the source container numbers.</p>
                 </div>
               )}
 
