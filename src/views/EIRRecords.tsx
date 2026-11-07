@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "@/lib/router";
 import { getDefaultCurrency } from "@/lib/finance-format";
 import { getPrintDepot } from "@/lib/app-settings";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -310,6 +311,20 @@ export default function EIRRecords() {
   const [deleteRecord, setDeleteRecord] = useState<any>(null);
   const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState("");
+  // ?open=<eir id> (from Approvals / notifications): show that EIR
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const id = searchParams.get("open");
+    if (!id) return;
+    let alive = true;
+    supabase.from("eir_records").select("eir_number").eq("id", id).maybeSingle().then(({ data }: any) => {
+      if (alive && data?.eir_number) setSearch(data.eir_number);
+    });
+    const next = new URLSearchParams(searchParams);
+    next.delete("open");
+    setSearchParams(next, { replace: true });
+    return () => { alive = false; };
+  }, [searchParams, setSearchParams]);
   const [selectedTemplate, setSelectedTemplate] = useState<EirTemplateType>("standard");
   const [shareRecord, setShareRecord] = useState<any>(null);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);

@@ -120,7 +120,7 @@ export default function Repatriation() {
   useEffect(() => {
     const hl = searchParams.get("highlight");
     if (!hl || !repatriations?.length) return;
-    const match = repatriations.find((r: any) => r.repatriation_number === hl);
+    const match = repatriations.find((r: any) => r.repatriation_number === hl || r.id === hl);
     if (match) {
       setAuditOpenId(match.id);
       const next = new URLSearchParams(searchParams);

@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "@/lib/router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,10 +37,29 @@ const methodLabels: Record<string, string> = {
   other: "Other",
 };
 
+/** ?open=<id> (from Approvals / notifications): show that one payment by filling the search box. */
+function useOpenBySearch(table: "payments" | "vendor_payments", setSearch: (v: string) => void) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const id = searchParams.get("open");
+    const tab = searchParams.get("tab");
+    if (!id || (tab ?? "customer") !== (table === "payments" ? "customer" : "vendor")) return;
+    let alive = true;
+    (supabase as any).from(table).select("payment_number").eq("id", id).maybeSingle().then(({ data }: any) => {
+      if (alive && data?.payment_number) setSearch(data.payment_number);
+    });
+    const next = new URLSearchParams(searchParams);
+    next.delete("open");
+    setSearchParams(next, { replace: true });
+    return () => { alive = false; };
+  }, [searchParams, setSearchParams, table, setSearch]);
+}
+
 // ─── Customer Receipts Tab ──────────────────────────
 function CustomerReceiptsTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
+  useOpenBySearch("payments", setSearch);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   useAuth();
@@ -350,6 +370,7 @@ function VendorPaymentsTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [lumpsumOpen, setLumpsumOpen] = useState(false);
   const [search, setSearch] = useState("");
+  useOpenBySearch("vendor_payments", setSearch);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   useAuth();
@@ -905,6 +926,13 @@ function UnrecordedPaymentsTab() {
 
 // ─── Main Payments Page ─────────────────────────────
 export default function Payments() {
+  const [pageParams, setPageParams] = useSearchParams();
+  const tab = pageParams.get("tab") ?? "customer";
+  const setTab = (v: string) => {
+    const next = new URLSearchParams(pageParams);
+    next.set("tab", v);
+    setPageParams(next, { replace: true });
+  };
   const { data: payments } = useQuery({
     queryKey: ["payments-summary"],
     queryFn: async () => {
@@ -1004,7 +1032,7 @@ export default function Payments() {
         </Card>
       </div>
 
-      <Tabs defaultValue="customer" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="customer">Customer Receipts</TabsTrigger>
           <TabsTrigger value="vendor">Vendor Payments</TabsTrigger>

@@ -177,7 +177,7 @@ export default function RepatProfitability() {
                       </TableCell>
                       <TableCell className="text-xs">
                         {r.invoice_id ? (
-                          <Link to={`/finance/invoices?id=${r.invoice_id}`} className="font-mono text-primary hover:underline">
+                          <Link to={`/billing/invoices?id=${r.invoice_id}`} className="font-mono text-primary hover:underline">
                             {r.invoice_number ?? "View"}
                           </Link>
                         ) : (

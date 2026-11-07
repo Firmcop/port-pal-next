@@ -142,7 +142,7 @@ export function RepatriationExecutionDialog({ repatriation, onOpenChange }: Prop
           {repatriation?.invoice_id && (
             <div className="rounded-md border bg-muted/30 p-3 text-xs">
               Invoiced to owner —{" "}
-              <Link to={`/finance/invoices?id=${repatriation.invoice_id}`} className="font-mono text-primary hover:underline">
+              <Link to={`/billing/invoices?id=${repatriation.invoice_id}`} className="font-mono text-primary hover:underline">
                 view invoice
               </Link>
             </div>

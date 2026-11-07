@@ -17,20 +17,15 @@ import { Shield, UserCog, Save, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { fmtMoney } from "@/lib/finance-format";
 import { STAFF_ROLES, ROLE_LABELS } from "@/lib/staff-roles";
+import { DOC_LINKS } from "@/lib/doc-links";
+import { Link } from "@/lib/router";
 
 const DOC_TYPES = ["quote", "purchase_order", "payment", "vendor_payment", "repatriation", "eir"];
 const DEFAULT_THRESHOLDS: Record<string, number> = {
   quote: 500000, purchase_order: 200000, payment: 100000, vendor_payment: 100000, repatriation: 0, eir: 0,
 };
 
-const DOC_ROUTES: Record<string, (id: string) => string> = {
-  quote: (id) => `/quotes?open=${id}`,
-  purchase_order: (id) => `/purchase-orders?open=${id}`,
-  payment: (id) => `/finance/payments?open=${id}`,
-  vendor_payment: (id) => `/finance/vendor-payments?open=${id}`,
-  repatriation: (id) => `/repatriations?open=${id}`,
-  eir: (id) => `/eir?open=${id}`,
-};
+const DOC_ROUTES = DOC_LINKS;
 
 export default function Approvals() {
   const org = useOrganization();
@@ -252,7 +247,7 @@ export default function Approvals() {
                       <TableCell className="font-mono text-xs">{r.assigned_to ? String(r.assigned_to).slice(0, 8) + "…" : "—"}</TableCell>
                       <TableCell className="text-right space-x-1">
                         {DOC_ROUTES[r.doc_type] && (
-                          <Button asChild size="sm" variant="ghost"><a href={DOC_ROUTES[r.doc_type](r.doc_id)}>Open</a></Button>
+                          <Button asChild size="sm" variant="ghost"><Link to={DOC_ROUTES[r.doc_type](r.doc_id)}>Open</Link></Button>
                         )}
                         {r.status === "pending" && (
                           <>

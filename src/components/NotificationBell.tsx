@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { docLink } from "@/lib/doc-links";
 import { useNavigate } from "@/lib/router";
 import { Bell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,13 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
-
-const routeMap: Record<string, string> = {
-  container_movements: "/movements",
-  gate_appointments: "/gate-appointments",
-  work_orders: "/work-orders",
-  containers: "/inventory",
-};
 
 interface Notification {
   id: string;
@@ -123,7 +117,7 @@ export function NotificationBell() {
                       setNotifications((prev) => prev.map((x) => x.id === n.id ? { ...x, is_read: true } : x));
                     }
                     setOpen(false);
-                    const route = routeMap[n.type] || (n.reference_type ? routeMap[n.reference_type] : null);
+                    const route = docLink(n.reference_type, n.reference_id) ?? (n.type === "approval" ? "/finance/approvals" : docLink(n.type));
                     if (route) navigate(route);
                   }}
                 >

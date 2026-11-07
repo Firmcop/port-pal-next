@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useSearchParams } from "@/lib/router";
 import { getDefaultCurrency } from "@/lib/finance-format";
 import { formatMoneyCode } from "@/lib/money";
 import { sourceLabel, sourceBadgeClass } from "@/components/finance/PoRecipientPreview";
@@ -84,6 +85,16 @@ function PurchaseOrdersTab() {
   const [open, setOpen] = useState(false);
   const [editingPoId, setEditingPoId] = useState<string | null>(null);
   const [viewPoId, setViewPoId] = useState<string | null>(null);
+  // ?open=<po id> (from Approvals / notifications) opens that purchase order
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const id = searchParams.get("open");
+    if (!id) return;
+    setViewPoId(id);
+    const next = new URLSearchParams(searchParams);
+    next.delete("open");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [receiptOpen, setReceiptOpen] = useState<string | null>(null);
   const [receiptNotes, setReceiptNotes] = useState("");
   const [receiptLines, setReceiptLines] = useState<Record<string, { received: string; reason: string }>>({});

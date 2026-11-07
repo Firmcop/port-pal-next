@@ -1188,7 +1188,7 @@ function ProcurementTab({ conversionId, requests, purchases, onSuccess, user }: 
                       </div>
                     )}
                     {r.status === "ordered" && r.purchase_order_id && (
-                      <Button size="sm" variant="ghost" asChild><Link to="/procurement/purchase-orders">View PO</Link></Button>
+                      <Button size="sm" variant="ghost" asChild><Link to="/procurement">View PO</Link></Button>
                     )}
                   </TableCell>
                 </TableRow>
