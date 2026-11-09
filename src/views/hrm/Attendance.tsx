@@ -17,6 +17,7 @@ import { formatMoney } from "@/lib/app-settings";
 import { useOrgCurrency } from "@/hooks/use-org-currency";
 import { useFinancialAccounts } from "@/hooks/use-financial-accounts";
 import { usePermission } from "@/hooks/use-permissions";
+import { WeekTasks } from "./WeekTasks";
 
 const NONE = "none";
 
@@ -57,7 +58,7 @@ export default function Attendance() {
   const [payAccount, setPayAccount] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [holidayOpen, setHolidayOpen] = useState(false);
-  const [view, setView] = useState<"lines" | "projects">("lines");
+  const [view, setView] = useState<"lines" | "projects" | "tasks">("lines");
   const { data: accounts = [] } = useFinancialAccounts();
 
   const weekEnd = addDays(weekStart, 6);
@@ -445,7 +446,9 @@ export default function Attendance() {
             <div className="flex rounded-md border p-0.5">
               <Button size="sm" variant={view === "lines" ? "secondary" : "ghost"} className="h-7 px-3" onClick={() => setView("lines")}>Entries</Button>
               <Button size="sm" variant={view === "projects" ? "secondary" : "ghost"} className="h-7 px-3" onClick={() => setView("projects")}>By project</Button>
+              <Button size="sm" variant={view === "tasks" ? "secondary" : "ghost"} className="h-7 px-3" onClick={() => setView("tasks")}>Tasks</Button>
             </div>
+            {view !== "tasks" && (<>
             {!restricted && (
               <Button size="sm" variant="outline" onClick={() => setHolidayOpen(true)}><CalendarDays className="mr-1 h-4 w-4" />Holidays</Button>
             )}
@@ -472,10 +475,13 @@ export default function Attendance() {
             {!restricted && week?.status === "paid" && balanceDue > 0.004 && (
               <Button size="sm" onClick={() => setPayOpen(true)}><Wallet className="mr-1 h-4 w-4" />Pay balance {formatMoney(balanceDue, currency)}</Button>
             )}
+            </>)}
           </div>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
-          {view === "projects" ? (
+          {view === "tasks" ? (
+            <WeekTasks weekStart={weekStart} weekEnd={weekEnd} jobs={jobs} projects={projects} canEdit={permissionsReady} />
+          ) : view === "projects" ? (
             <ProjectAttendanceView
               byProject={byProject}
               restricted={restricted}

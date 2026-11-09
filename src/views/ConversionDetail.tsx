@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { getDefaultCurrency, fmtMoney } from "@/lib/finance-format";
+import { WorkTasksPanel } from "@/components/work-tasks/WorkTasksPanel";
 import { useParams, useNavigate, Link } from "@/lib/router";
 import { useConversionCostSync, isDrifted } from "@/hooks/use-conversion-cost-sync";
 import { resyncConversionContainerCosts, type ResyncPreviewRow } from "@/lib/conversion-cost-sync";
@@ -142,15 +143,6 @@ export default function ConversionDetail() {
     enabled: !!id,
   });
 
-  const { data: tasks = [] } = useQuery({
-    queryKey: ["conversion-tasks", id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("conversion_tasks").select("*").eq("conversion_id", id!).order("created_at");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!id,
-  });
 
   const { data: services = [] } = useQuery({
     queryKey: ["conversion-services", id],
@@ -242,7 +234,7 @@ export default function ConversionDetail() {
     qc.invalidateQueries({ queryKey: ["conversion-materials", id] });
     qc.invalidateQueries({ queryKey: ["conversion-labour", id] });
 
-    qc.invalidateQueries({ queryKey: ["conversion-tasks", id] });
+    qc.invalidateQueries({ queryKey: ["conversion-work-tasks", id] });
     qc.invalidateQueries({ queryKey: ["conversion-services", id] });
     qc.invalidateQueries({ queryKey: ["material-requests", id] });
     qc.invalidateQueries({ queryKey: ["purchases", id] });
@@ -488,7 +480,7 @@ export default function ConversionDetail() {
         <TabsContent value="variance"><VarianceTab conversionId={id!} materials={materials} /></TabsContent>
         <TabsContent value="timeline"><TimelineTab conversionId={id!} job={j} /></TabsContent>
         <TabsContent value="labour"><LabourTab conversionId={id!} labour={labour} onSuccess={invalidateAll} /></TabsContent>
-        <TabsContent value="tasks"><TasksTab conversionId={id!} tasks={tasks} onSuccess={invalidateAll} /></TabsContent>
+        <TabsContent value="tasks"><WorkTasksPanel conversionId={id!} /></TabsContent>
         <TabsContent value="procurement"><ProcurementTab conversionId={id!} requests={requests} purchases={purchases} onSuccess={invalidateAll} user={user} /></TabsContent>
         <TabsContent value="costs"><CostsTab costs={costs} conversionId={id!} services={services} onSuccess={invalidateAll} currency={(j as any)?.currency || getDefaultCurrency()} /></TabsContent>
         <TabsContent value="invoice"><InvoiceTab job={j} costs={costs} /></TabsContent>
@@ -983,82 +975,6 @@ function AddEmployeeDialog({ open, onOpenChange }: { open: boolean; onOpenChange
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/* ── Tasks Tab (with employee assignment) ── */
-function TasksTab({ conversionId, tasks, onSuccess }: { conversionId: string; tasks: any[]; onSuccess: () => void }) {
-  const { toast } = useToast();
-  const { data: employees = [] } = useEmployees();
-  const [f, setF] = useState({ task_name: "", assigned_to: "" });
-
-  const addMut = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from("conversion_tasks").insert({
-        conversion_id: conversionId,
-        task_name: f.task_name,
-        assigned_to: f.assigned_to || null,
-      } as any);
-      if (error) throw error;
-    },
-    onSuccess: () => { onSuccess(); toast({ title: "Task added" }); setF({ task_name: "", assigned_to: "" }); },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const updateTask = useMutation({
-    mutationFn: async ({ taskId, status }: { taskId: string; status: string }) => {
-      const updates: Record<string, unknown> = { status };
-      if (status === "in_progress") updates.start_time = new Date().toISOString();
-      if (status === "completed") updates.end_time = new Date().toISOString();
-      const { error } = await supabase.from("conversion_tasks").update(updates as any).eq("id", taskId);
-      if (error) throw error;
-    },
-    onSuccess: () => { onSuccess(); toast({ title: "Task updated" }); },
-  });
-
-  return (
-    <Card>
-      <CardHeader><CardTitle className="flex items-center gap-2 text-base"><ClipboardList className="h-4 w-4" />Work Tasks</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
-        <form onSubmit={(e) => { e.preventDefault(); addMut.mutate(); }} className="grid grid-cols-3 gap-3">
-          <div className="space-y-1"><Label className="text-xs">Task Name</Label><Input value={f.task_name} onChange={(e) => setF((p) => ({ ...p, task_name: e.target.value }))} required /></div>
-          <div className="space-y-1">
-            <Label className="text-xs">Assign To</Label>
-            <Select value={f.assigned_to || "__none"} onValueChange={(v) => setF(p => ({ ...p, assigned_to: v === "__none" ? "" : v }))}>
-              <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none">— Unassigned —</SelectItem>
-                {employees.map((e: any) => (
-                  <SelectItem key={e.id} value={`${e.name} (${e.role})`}>{e.name} — {e.role}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-end"><Button type="submit" size="sm" disabled={addMut.isPending || !f.task_name}><Plus className="mr-1 h-3 w-3" />Add Task</Button></div>
-        </form>
-        <Separator />
-        <Table>
-          <TableHeader><TableRow><TableHead>Task</TableHead><TableHead>Assigned</TableHead><TableHead>Status</TableHead><TableHead>Started</TableHead><TableHead>Ended</TableHead><TableHead></TableHead></TableRow></TableHeader>
-          <TableBody>
-            {!tasks.length ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-4 text-muted-foreground">No tasks</TableCell></TableRow>
-            ) : tasks.map((t: any) => (
-              <TableRow key={t.id}>
-                <TableCell>{t.task_name}</TableCell>
-                <TableCell className="text-muted-foreground">{t.assigned_to ?? "—"}</TableCell>
-                <TableCell><Badge className={taskStatusColor[t.status] ?? ""} variant="secondary">{t.status?.replace("_", " ")}</Badge></TableCell>
-                <TableCell className="text-xs">{t.start_time ? format(new Date(t.start_time), "dd MMM HH:mm") : "—"}</TableCell>
-                <TableCell className="text-xs">{t.end_time ? format(new Date(t.end_time), "dd MMM HH:mm") : "—"}</TableCell>
-                <TableCell className="space-x-1">
-                  {t.status === "pending" && <Button size="sm" variant="outline" onClick={() => updateTask.mutate({ taskId: t.id, status: "in_progress" })}>Start</Button>}
-                  {t.status === "in_progress" && <Button size="sm" variant="outline" onClick={() => updateTask.mutate({ taskId: t.id, status: "completed" })}>Done</Button>}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
   );
 }
 

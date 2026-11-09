@@ -11,6 +11,7 @@ import { ArrowLeft, FolderKanban, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { EditConversionRevenueDialog } from "@/components/conversions/EditConversionRevenueDialog";
 import { useUserStaffRole } from "@/hooks/use-user-staff-role";
+import { WorkTasksPanel } from "@/components/work-tasks/WorkTasksPanel";
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -142,6 +143,7 @@ export default function ProjectDetail() {
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
           <TabsTrigger value="conversions">Conversion Jobs</TabsTrigger>
           <TabsTrigger value="subassemblies">Sub-assembly Builds</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks</TabsTrigger>
 
         </TabsList>
         <TabsContent value="transactions" className="mt-4">
@@ -269,6 +271,9 @@ export default function ProjectDetail() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="tasks" className="mt-4">
+          <WorkTasksPanel projectId={id} />
         </TabsContent>
       </Tabs>
 
