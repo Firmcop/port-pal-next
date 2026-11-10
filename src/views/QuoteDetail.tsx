@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { lineNet, quoteTotals, type QuoteDiscountType } from "@/lib/quote-totals";
 import { useParams, Link, useNavigate } from "@/lib/router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -366,6 +367,7 @@ export default function QuoteDetail() {
       customer: quote!.customers ? { company_name: (quote!.customers as any).company_name } : null,
       organization: orgRow ? { name: orgRow.name, tax_id: orgRow.tax_id ?? null, address: orgRow.address ?? null } : null,
       issuer_name: user?.email ?? null,
+      discount: { type: ((quote as any).discount_type ?? "amount") as QuoteDiscountType, value: Number((quote as any).discount_value ?? 0) },
       sections: (sections ?? []).map((sec) => ({
         id: sec.id, title: sec.title, kind: sec.kind,
         items: (itemsBySection.get(sec.id) ?? []).map((it) => ({
@@ -397,20 +399,15 @@ export default function QuoteDetail() {
     const m = new Map<string, number>();
     (items ?? []).forEach((it) => {
       const key = it.section_id ?? "_unassigned";
-      m.set(key, (m.get(key) ?? 0) + Number(it.total_price || 0));
+      m.set(key, (m.get(key) ?? 0) + lineNet(it));
     });
     return m;
   }, [items]);
 
-  const grandTotal = (items ?? []).reduce((s, it) => s + Number(it.total_price || 0), 0);
-  const totalDiscount = (items ?? []).reduce((s, it) => {
-    const gross = Number(it.quantity || 0) * Number(it.unit_price || 0);
-    return s + gross * (Number(it.discount_pct || 0) / 100);
-  }, 0);
-  const totalTax = (items ?? []).reduce((s, it) => {
-    const net = Number(it.quantity || 0) * Number(it.unit_price || 0) * (1 - Number(it.discount_pct || 0) / 100);
-    return s + net * (Number(it.tax_pct || 0) / 100);
-  }, 0);
+  const totals = quoteTotals(items ?? [], {
+    type: ((quote as any)?.discount_type ?? "amount") as QuoteDiscountType,
+    value: (quote as any)?.discount_value ?? 0,
+  });
 
   if (isLoading) return <div className="p-8 text-muted-foreground">Loading…</div>;
   if (!quote) return <div className="p-8 text-muted-foreground">Quote not found.</div>;
@@ -590,7 +587,6 @@ export default function QuoteDetail() {
                       <TableHead className="w-20">Unit</TableHead>
                       <TableHead className="w-20 text-right">Qty</TableHead>
                       <TableHead className="w-28 text-right">Unit Price</TableHead>
-                      <TableHead className="w-20 text-right">Disc %</TableHead>
                       <TableHead className="w-20 text-right">Tax %</TableHead>
                       <TableHead className="w-28 text-right">Line Total</TableHead>
                       <TableHead className="w-10"></TableHead>
@@ -658,14 +654,24 @@ export default function QuoteDetail() {
                 <p className="text-muted-foreground">No sections yet.</p>
               )}
               <div className="border-t pt-3 space-y-1">
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Total Discount</span><span className="font-mono">−{fmt(totalDiscount)}</span>
+                <div className="flex justify-between">
+                  <span>Subtotal</span><span className="font-mono">{fmt(totals.subtotal)}</span>
                 </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Total Tax</span><span className="font-mono">{fmt(totalTax)}</span>
-                </div>
+                <QuoteDiscountEditor
+                  editable={editable}
+                  type={((quote as any).discount_type ?? "amount") as QuoteDiscountType}
+                  value={Number((quote as any).discount_value ?? 0)}
+                  amount={totals.discount}
+                  fmt={fmt}
+                  onSave={(patch) => updateQuote.mutate(patch as any)}
+                />
+                {totals.tax > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Tax</span><span className="font-mono">{fmt(totals.tax)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-base font-bold pt-2 border-t">
-                  <span>Grand Total</span><span className="font-mono">{fmt(grandTotal)}</span>
+                  <span>Grand Total</span><span className="font-mono">{fmt(totals.total)}</span>
                 </div>
               </div>
               <Button className="w-full" variant="outline" onClick={() => snapshotMut.mutate()}>
@@ -894,11 +900,6 @@ function ItemRow({
           onBlur={(e) => Number(e.target.value) !== Number(item.unit_price) && commit({ unit_price: Number(e.target.value) || 0 })} />
       </TableCell>
       <TableCell>
-        <Input type="number" step="0.01" className="h-8 text-right" value={local.discount_pct ?? 0}
-          onChange={(e) => set({ discount_pct: e.target.value })}
-          onBlur={(e) => Number(e.target.value) !== Number(item.discount_pct) && commit({ discount_pct: Number(e.target.value) || 0 })} />
-      </TableCell>
-      <TableCell>
         <Input type="number" step="0.01" className="h-8 text-right" value={local.tax_pct ?? 0}
           onChange={(e) => set({ tax_pct: e.target.value })}
           onBlur={(e) => Number(e.target.value) !== Number(item.tax_pct) && commit({ tax_pct: Number(e.target.value) || 0 })} />
@@ -910,5 +911,50 @@ function ItemRow({
         </Button>
       </TableCell>
     </TableRow>
+  );
+}
+
+/** Whole-quote discount (amount or %), taken off the subtotal before tax. */
+function QuoteDiscountEditor({ editable, type, value, amount, fmt, onSave }: {
+  editable: boolean; type: QuoteDiscountType; value: number; amount: number;
+  fmt: (n: number) => string; onSave: (patch: { discount_type?: QuoteDiscountType; discount_value?: number }) => void;
+}) {
+  const [draft, setDraft] = useState<string>(String(value || ""));
+  useEffect(() => setDraft(value ? String(value) : ""), [value]);
+  const commit = () => {
+    const v = Math.max(0, Number(draft) || 0);
+    const capped = type === "percent" ? Math.min(v, 100) : v;
+    if (capped !== value) onSave({ discount_value: capped });
+  };
+  if (!editable) {
+    return amount > 0 ? (
+      <div className="flex justify-between text-muted-foreground">
+        <span>Discount{type === "percent" ? ` (${value}%)` : ""}</span><span className="font-mono">−{fmt(amount)}</span>
+      </div>
+    ) : null;
+  }
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <span>Discount</span>
+        <div className="flex items-center gap-1">
+          <Select value={type} onValueChange={(t) => onSave({ discount_type: t as QuoteDiscountType })}>
+            <SelectTrigger className="h-8 w-[78px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="amount">Amt</SelectItem>
+              <SelectItem value="percent">%</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input type="number" min={0} step="0.01" className="h-8 w-28 text-right font-mono" placeholder="0"
+            value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={commit}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+        </div>
+      </div>
+      {amount > 0 && (
+        <div className="flex justify-between text-muted-foreground">
+          <span>{type === "percent" ? `${value}% off` : "Off"}</span><span className="font-mono">−{fmt(amount)}</span>
+        </div>
+      )}
+    </div>
   );
 }

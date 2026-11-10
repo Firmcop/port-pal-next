@@ -456,7 +456,6 @@ function TemplateEditorDialog({ templateId, onClose }: { templateId: string | nu
                           <TableHead>Unit</TableHead>
                           <TableHead className="text-right">Qty</TableHead>
                           <TableHead className="text-right">Unit Price</TableHead>
-                          <TableHead className="text-right">Disc %</TableHead>
                           <TableHead className="text-right">Tax %</TableHead>
                           <TableHead></TableHead>
                         </TableRow>
@@ -472,9 +471,6 @@ function TemplateEditorDialog({ templateId, onClose }: { templateId: string | nu
                               onBlur={(e) => updateItem.mutate({ id: i.id, patch: { default_quantity: Number(e.target.value) } })} /></TableCell>
                             <TableCell><Input type="number" className="w-28 text-right" defaultValue={i.default_unit_price}
                               onBlur={(e) => updateItem.mutate({ id: i.id, patch: { default_unit_price: Number(e.target.value) } })} /></TableCell>
-
-                            <TableCell><Input type="number" className="w-16 text-right" defaultValue={i.discount_pct ?? 0}
-                              onBlur={(e) => updateItem.mutate({ id: i.id, patch: { discount_pct: Number(e.target.value) } })} /></TableCell>
                             <TableCell><Input type="number" className="w-16 text-right" defaultValue={i.tax_pct ?? 0}
                               onBlur={(e) => updateItem.mutate({ id: i.id, patch: { tax_pct: Number(e.target.value) } })} /></TableCell>
                             <TableCell>

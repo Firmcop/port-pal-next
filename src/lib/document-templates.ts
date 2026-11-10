@@ -1,4 +1,5 @@
 import * as QRCode from "qrcode";
+import { lineNet, quoteTotals, type QuoteDiscountType } from "./quote-totals";
 import { getAppSettings, getOrgCurrency, symbolForCurrency } from "@/lib/app-settings";
 import { logoOrNameHtml, toPrintableImageUrl } from "@/lib/print-assets";
 
@@ -745,6 +746,8 @@ export interface QuotePrintData {
   customer?: { company_name?: string | null; tax_id?: string | null; email?: string | null; phone?: string | null } | null;
   organization?: { name?: string | null; tax_id?: string | null; address?: string | null; logo_url?: string | null } | null;
   issuer_name?: string | null;
+  /** whole-quote discount, taken off the subtotal before tax */
+  discount?: { type: QuoteDiscountType; value: number } | null;
   sections: Array<{
     id: string;
     title: string;
@@ -770,15 +773,14 @@ export interface QuotePrintData {
 
 
 export async function printQuote(data: QuotePrintData) {
-  const subtotalGross = data.sections.flatMap(s => s.items)
-    .reduce((s, it) => s + Number(it.quantity || 0) * Number(it.unit_price || 0), 0);
-  const totalDiscount = data.sections.flatMap(s => s.items)
-    .reduce((s, it) => s + Number(it.quantity || 0) * Number(it.unit_price || 0) * (Number(it.discount_pct || 0) / 100), 0);
-  const totalTax = data.sections.flatMap(s => s.items).reduce((s, it) => {
-    const net = Number(it.quantity || 0) * Number(it.unit_price || 0) * (1 - Number(it.discount_pct || 0) / 100);
-    return s + net * (Number(it.tax_pct || 0) / 100);
-  }, 0);
-  const grandTotal = data.sections.flatMap(s => s.items).reduce((s, it) => s + Number(it.total_price || 0), 0);
+  const allItems = data.sections.flatMap(s => s.items);
+  const totals = quoteTotals(allItems, data.discount ?? null);
+  const grandTotal = totals.total;
+  // line discount / tax columns only when a line actually uses them
+  const showDisc = allItems.some(it => Number(it.discount_pct || 0) !== 0);
+  const showTax = allItems.some(it => Number(it.tax_pct || 0) !== 0);
+  const lineAmount = (it: { quantity: number; unit_price: number; discount_pct: number }) => lineNet(it);
+  const cols = 5 + (showDisc ? 1 : 0) + (showTax ? 1 : 0);
 
   const qr = await generateQrDataUrl(JSON.stringify({ q: data.quote_number, total: grandTotal }));
   const hash = await generateDocHash(JSON.stringify({ n: data.quote_number, t: grandTotal, c: data.created_at }));
@@ -802,7 +804,7 @@ export async function printQuote(data: QuotePrintData) {
   const appendixVisuals = visuals.filter(v => v.kind !== "cover");
 
   const sectionTables = data.sections.map((sec) => {
-    const subtotal = sec.items.reduce((s, it) => s + Number(it.total_price || 0), 0);
+    const subtotal = sec.items.reduce((s, it) => s + lineAmount(it), 0);
     const sectionVisuals = visualsBySection.get(sec.id) ?? [];
     const banner = sectionVisuals.length
       ? `<div style="margin:14px 0 6px"><img src="${sectionVisuals[0].image_url}" style="width:100%;max-height:170px;object-fit:cover;border-radius:6px"/></div>`
@@ -813,11 +815,11 @@ export async function printQuote(data: QuotePrintData) {
         <td>${v(it.unit ?? "")}</td>
         <td style="text-align:right">${Number(it.quantity).toLocaleString()}</td>
         <td style="text-align:right" class="amount">${fmt(it.unit_price)}</td>
-        <td style="text-align:right">${Number(it.discount_pct || 0)}%</td>
-        <td style="text-align:right">${Number(it.tax_pct || 0)}%</td>
-        <td style="text-align:right" class="amount">${fmt(it.total_price)}</td>
+        ${showDisc ? `<td style="text-align:right">${Number(it.discount_pct || 0)}%</td>` : ""}
+        ${showTax ? `<td style="text-align:right">${Number(it.tax_pct || 0)}%</td>` : ""}
+        <td style="text-align:right" class="amount">${fmt(lineAmount(it))}</td>
       </tr>
-    `).join("") : `<tr><td colspan="7" style="text-align:center;color:#888">No items</td></tr>`;
+    `).join("") : `<tr><td colspan="${cols}" style="text-align:center;color:#888">No items</td></tr>`;
 
     return `
       ${banner}
@@ -829,14 +831,14 @@ export async function printQuote(data: QuotePrintData) {
             <th>Description</th><th>Unit</th>
             <th style="text-align:right">Qty</th>
             <th style="text-align:right">Unit Price</th>
-            <th style="text-align:right">Disc %</th>
-            <th style="text-align:right">Tax %</th>
+            ${showDisc ? `<th style="text-align:right">Disc %</th>` : ""}
+            ${showTax ? `<th style="text-align:right">Tax %</th>` : ""}
             <th style="text-align:right">Line Total</th>
           </tr>
         </thead>
         <tbody>${rows}
           <tr>
-            <td colspan="6" style="text-align:right;font-weight:bold;background:#f5f5f5">Section Subtotal</td>
+            <td colspan="${cols - 1}" style="text-align:right;font-weight:bold;background:#f5f5f5">Section Subtotal</td>
             <td style="text-align:right;font-weight:bold;background:#f5f5f5" class="amount">${fmt(subtotal)}</td>
           </tr>
         </tbody>
@@ -845,7 +847,7 @@ export async function printQuote(data: QuotePrintData) {
   }).join("");
 
   const sectionSummaryRows = data.sections.map(sec => {
-    const subtotal = sec.items.reduce((s, it) => s + Number(it.total_price || 0), 0);
+    const subtotal = sec.items.reduce((s, it) => s + lineAmount(it), 0);
     return `<tr><td>${v(sec.title)}</td><td style="text-align:right" class="amount">${fmt(subtotal)}</td></tr>`;
   }).join("");
 
@@ -919,9 +921,9 @@ ${sectionTables}
   <thead><tr><th>Section</th><th style="text-align:right;width:30%">Subtotal</th></tr></thead>
   <tbody>
     ${sectionSummaryRows}
-    <tr><td style="text-align:right">Subtotal (gross)</td><td style="text-align:right" class="amount">${fmt(subtotalGross)}</td></tr>
-    <tr><td style="text-align:right">Total Discount</td><td style="text-align:right" class="amount">−${fmt(totalDiscount)}</td></tr>
-    <tr><td style="text-align:right">Total Tax</td><td style="text-align:right" class="amount">${fmt(totalTax)}</td></tr>
+    <tr><td style="text-align:right">Subtotal</td><td style="text-align:right" class="amount">${fmt(totals.subtotal)}</td></tr>
+    ${totals.discount > 0 ? `<tr><td style="text-align:right">Discount${data.discount?.type === "percent" ? ` (${Number(data.discount.value)}%)` : ""}</td><td style="text-align:right" class="amount">−${fmt(totals.discount)}</td></tr>` : ""}
+    ${totals.tax > 0 ? `<tr><td style="text-align:right">Tax</td><td style="text-align:right" class="amount">${fmt(totals.tax)}</td></tr>` : ""}
     <tr class="total-row"><td style="text-align:right">GRAND TOTAL</td><td style="text-align:right" class="amount">${fmt(grandTotal)}</td></tr>
   </tbody>
 </table>
