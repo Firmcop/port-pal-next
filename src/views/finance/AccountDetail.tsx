@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Wallet } from "lucide-react";
 import { format } from "date-fns";
+import { isForeignLine, lineInAccountCurrency } from "@/lib/account-currency";
 
 export default function AccountDetail() {
   const { id } = useParams();
@@ -79,8 +80,8 @@ export default function AccountDetail() {
                   <TableCell className="font-mono text-xs">{t.transaction_number}</TableCell>
                   <TableCell>{t.description}</TableCell>
                   <TableCell className="text-xs">{t.category?.replace("_"," ")}</TableCell>
-                  <TableCell className="text-right font-mono">{Number(t.debit_amount) > 0 ? Number(t.debit_amount).toFixed(2) : ""}</TableCell>
-                  <TableCell className="text-right font-mono">{Number(t.credit_amount) > 0 ? Number(t.credit_amount).toFixed(2) : ""}</TableCell>
+                  <AmountCell amount={Number(t.debit_amount)} line={t} accountCurrency={account?.currency} />
+                  <AmountCell amount={Number(t.credit_amount)} line={t} accountCurrency={account?.currency} />
                   <TableCell>{t.cleared_at ? <Badge variant="secondary" className="bg-success/15 text-success">cleared</Badge> : <Badge variant="outline">open</Badge>}</TableCell>
                 </TableRow>
               ))}
@@ -89,5 +90,21 @@ export default function AccountDetail() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/** Amount in the account's currency; a line in another currency also shows its own amount and rate. */
+function AmountCell({ amount, line, accountCurrency }: { amount: number; line: any; accountCurrency?: string | null }) {
+  if (!(amount > 0)) return <TableCell />;
+  const foreign = isForeignLine(line, accountCurrency);
+  return (
+    <TableCell className="text-right font-mono">
+      {lineInAccountCurrency(amount, line, accountCurrency).toFixed(2)}
+      {foreign && (
+        <div className="text-[11px] text-muted-foreground">
+          {line.currency} {amount.toFixed(2)}{line.fx_rate ? ` @ ${Number(line.fx_rate).toFixed(2)}` : ""}
+        </div>
+      )}
+    </TableCell>
   );
 }

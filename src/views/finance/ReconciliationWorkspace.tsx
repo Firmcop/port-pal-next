@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { lineInAccountCurrency } from "@/lib/account-currency";
 import { useParams, Link, useNavigate } from "@/lib/router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -111,11 +112,16 @@ export default function ReconciliationWorkspace() {
     onError: (e: any) => toast({ title: "Cannot complete", description: e.message, variant: "destructive" }),
   });
 
+  // book lines in the account's currency (a USD line on a KES account at its own rate)
+  const acctCur = recon?.account?.currency as string | undefined;
+  const dr = (t: any) => (t ? lineInAccountCurrency(Number(t.debit_amount || 0), t, acctCur) : 0);
+  const cr = (t: any) => (t ? lineInAccountCurrency(Number(t.credit_amount || 0), t, acctCur) : 0);
+
   const clearedTotal = useMemo(() => {
     return (lines ?? []).filter((l: any) => l.cleared).reduce((s: number, l: any) => {
-      return s + (Number(l.transaction?.debit_amount || 0) - Number(l.transaction?.credit_amount || 0));
+      return s + dr(l.transaction) - cr(l.transaction);
     }, 0);
-  }, [lines]);
+  }, [lines, acctCur]);
 
   const expected = recon ? Number(recon.statement_closing_balance) - Number(recon.statement_opening_balance) : 0;
   const diff = expected - clearedTotal;
@@ -131,7 +137,7 @@ export default function ReconciliationWorkspace() {
     for (const l of lines as any[]) {
       const t = l.transaction;
       if (!t) continue;
-      const sig = `${Math.round((Number(t.debit_amount || 0) - Number(t.credit_amount || 0)) * 100)}`;
+      const sig = `${Math.round((dr(t) - cr(t)) * 100)}`;
       amounts.set(sig, (amounts.get(sig) ?? 0) + 1);
     }
     for (const l of lines as any[]) {
@@ -140,7 +146,7 @@ export default function ReconciliationWorkspace() {
       const t = l.transaction;
       if (!t) continue;
       if (t.reconciliation_id && t.reconciliation_id !== recon.id) c.push("linked to other reconciliation");
-      const sig = `${Math.round((Number(t.debit_amount || 0) - Number(t.credit_amount || 0)) * 100)}`;
+      const sig = `${Math.round((dr(t) - cr(t)) * 100)}`;
       if ((amounts.get(sig) ?? 0) > 1) c.push("possible duplicate amount");
       const dStart = differenceInDays(new Date(t.transaction_date), new Date(recon.statement_start));
       const dEnd = differenceInDays(new Date(recon.statement_end), new Date(t.transaction_date));
@@ -148,15 +154,15 @@ export default function ReconciliationWorkspace() {
       if (c.length) m[l.id] = c;
     }
     return m;
-  }, [lines, recon]);
+  }, [lines, recon, acctCur]);
 
   const selectionStats = useMemo(() => {
     const sel = (lines ?? []).filter((l: any) => selected.has(l.id));
-    const totalDebit = sel.reduce((s: number, l: any) => s + Number(l.transaction?.debit_amount || 0), 0);
-    const totalCredit = sel.reduce((s: number, l: any) => s + Number(l.transaction?.credit_amount || 0), 0);
+    const totalDebit = sel.reduce((s: number, l: any) => s + dr(l.transaction), 0);
+    const totalCredit = sel.reduce((s: number, l: any) => s + cr(l.transaction), 0);
     const conflictCount = sel.filter((l: any) => conflictsFor[l.id]).length;
     return { totalDebit, totalCredit, conflictCount };
-  }, [lines, selected, conflictsFor]);
+  }, [lines, selected, conflictsFor, acctCur]);
 
   const bulkClear = useMutation({
     mutationFn: async (skipConflicts: boolean) => {
@@ -322,8 +328,8 @@ export default function ReconciliationWorkspace() {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-mono">{Number(l.transaction?.debit_amount || 0) > 0 ? Number(l.transaction.debit_amount).toFixed(2) : ""}</TableCell>
-                      <TableCell className="text-right font-mono">{Number(l.transaction?.credit_amount || 0) > 0 ? Number(l.transaction.credit_amount).toFixed(2) : ""}</TableCell>
+                      <TableCell className="text-right font-mono">{dr(l.transaction) > 0 ? dr(l.transaction).toFixed(2) : ""}</TableCell>
+                      <TableCell className="text-right font-mono">{cr(l.transaction) > 0 ? cr(l.transaction).toFixed(2) : ""}</TableCell>
                     </TableRow>
                   );
                 })}
