@@ -18,6 +18,7 @@ const CATEGORIES: { code: string; label: string; hint: string }[] = [
   { code: "release_instruction", label: "Release Instructions", hint: "New pickup/delivery instructions from portal/WhatsApp" },
   { code: "sale_completed", label: "Container Sale Completed", hint: "Sale finalised, ownership and ledger updated" },
   { code: "repatriation", label: "Repatriation Events", hint: "Dispatched, completed, cost overruns" },
+  { code: "conversion_jobs", label: "Conversion Jobs", hint: "New job, started, completed, cancelled, linked to a project" },
   { code: "sync_audit_finding", label: "Sync Audit Findings", hint: "Cross-module integrity warnings (admin)" },
   { code: "vendor_payment", label: "Vendor Payments", hint: "Outgoing PO payments processed" },
   { code: "leasing_offhire", label: "Leasing On/Off-Hire", hint: "Lease lifecycle updates and DPP" },

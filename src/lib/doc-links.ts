@@ -15,6 +15,8 @@ export const DOC_LINKS: Record<string, (id?: string | null) => string> = {
   goods_receipt_variance: () => "/finance/approvals",
   operating_expense: () => "/finance/operating-expenses",
   // non-approval notifications
+  container_conversions: (id) => (id ? `/conversions/${id}` : "/conversions"),
+  conversion: (id) => (id ? `/conversions/${id}` : "/conversions"),
   container_movements: () => "/movements",
   gate_appointments: () => "/gate/appointments",
   work_orders: () => "/mr/work-orders",
