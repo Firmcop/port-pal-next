@@ -10586,6 +10586,10 @@ export type Database = {
           tax_rate: number
           total_cost: number
           unit_price: number
+          container_size: string | null
+          container_height: string | null
+          container_category: string | null
+          container_grade: string | null
         }
         Insert: {
           allocated_freight?: number
@@ -10605,6 +10609,10 @@ export type Database = {
           tax_rate?: number
           total_cost?: number
           unit_price?: number
+          container_size?: string | null
+          container_height?: string | null
+          container_category?: string | null
+          container_grade?: string | null
         }
         Update: {
           allocated_freight?: number
@@ -10624,6 +10632,10 @@ export type Database = {
           tax_rate?: number
           total_cost?: number
           unit_price?: number
+          container_size?: string | null
+          container_height?: string | null
+          container_category?: string | null
+          container_grade?: string | null
         }
         Relationships: [
           {
@@ -11010,6 +11022,9 @@ export type Database = {
           tax_code_id: string | null
           tax_total: number
           total_cost: number
+          po_type: string
+          pickup_location: string | null
+          expected_delivery: string | null
         }
         Insert: {
           approval_request_id?: string | null
@@ -11040,6 +11055,9 @@ export type Database = {
           tax_code_id?: string | null
           tax_total?: number
           total_cost?: number
+          po_type?: string
+          pickup_location?: string | null
+          expected_delivery?: string | null
         }
         Update: {
           approval_request_id?: string | null
@@ -11070,6 +11088,9 @@ export type Database = {
           tax_code_id?: string | null
           tax_total?: number
           total_cost?: number
+          po_type?: string
+          pickup_location?: string | null
+          expected_delivery?: string | null
         }
         Relationships: [
           {

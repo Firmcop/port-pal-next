@@ -65,6 +65,8 @@ const addContainerSchema = z.object({
   offloading_vendor: z.string().trim().max(160).optional().or(z.literal("")),
   acquisition_currency: z.string().trim().max(8).optional().or(z.literal("")),
   override_reason: z.string().trim().max(300).optional().or(z.literal("")),
+  /** bought on a container purchase order: the PO carries seller and price */
+  po_item_id: z.string().uuid().optional().nullable().or(z.literal("")),
 }).superRefine((val, ctx) => {
   if (val.category === "dry" && !val.height_class) {
     ctx.addIssue({ code: "custom", path: ["height_class"], message: "Height class required for dry containers" });
@@ -74,7 +76,7 @@ const addContainerSchema = z.object({
       ctx.addIssue({ code: "custom", path: ["owner"], message: "Owner is required for shipper-owned containers" });
     }
   }
-  if (val.ownership_type === "depot_owned") {
+  if (val.ownership_type === "depot_owned" && !val.po_item_id) {
     if (!val.seller_name || val.seller_name.trim().length < 2) {
       ctx.addIssue({ code: "custom", path: ["seller_name"], message: "Seller is required when depot purchases the container" });
     }
@@ -284,6 +286,8 @@ export default function Inventory() {
 
       const overrideReason: string = (payload.override_reason ?? "").toString();
       delete payload.override_reason;
+      const poItemId: string | null = payload.ownership_type === "depot_owned" ? (payload.po_item_id || null) : null;
+      delete payload.po_item_id;
 
       // Normalise acquisition service cost fields (they persist on the container row)
       payload.transport_cost = Number(payload.transport_cost ?? 0) || 0;
@@ -357,7 +361,21 @@ export default function Inventory() {
       });
 
       // 4) If depot purchased, generate supplier invoice payable to seller
-      if (payload.ownership_type === "depot_owned" && sellerName && purchasePrice > 0) {
+      if (poItemId) {
+        // Bought on a container PO: receive it there. The PO carries the price, the
+        // supplier payable and any advance already paid; no separate seller bill.
+        const { data: line } = await supabase.from("po_items").select("po_id").eq("id", poItemId).maybeSingle();
+        const { error: rErr } = await supabase.rpc("container_po_receive" as any, {
+          _po_id: (line as any)?.po_id,
+          _units: [{ po_item_id: poItemId, container_id: containerId, delivery: "yard",
+                     received_at: new Date().toISOString().slice(0, 10) }],
+          _notes: `Gate-in of ${containerNumber}`,
+        } as any);
+        if (rErr) {
+          throw new Error(`${containerNumber} was added to the yard, but could not be received on the purchase order: ${rErr.message}. `
+            + "Receive it from Procurement → Container POs with the same number.");
+        }
+      } else if (payload.ownership_type === "depot_owned" && sellerName && purchasePrice > 0) {
         await acquireContainerFromOwner({
           containerId,
           amount: purchasePrice,
@@ -1324,12 +1342,37 @@ function AddContainerDialog({
     offloading_vendor: acqDefaults.offloadingVendor,
     acquisition_currency: orgCurrency,
     override_reason: "",
+    po_item_id: "",
   });
   const { data: suppliers } = useQuery({
     queryKey: ["suppliers-active-pick"],
     enabled: open,
     queryFn: async () => (await supabase.from("suppliers").select("id,name,currency").eq("is_active", true).order("name")).data ?? [],
   });
+  // open container purchase-order lines a depot-owned container can be received against
+  const { data: openPoLines } = useQuery({
+    queryKey: ["open-container-po-lines"],
+    enabled: open,
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("po_items")
+        .select("id, description, quantity, received_qty, container_size, container_height, container_category, purchase_orders!inner(id, po_number, status, po_type, approval_status, suppliers(name))")
+        .eq("purchase_orders.po_type", "containers")
+        .in("purchase_orders.status", ["confirmed", "partially_received"]);
+      return ((data ?? []) as any[]).filter((l) => Number(l.quantity) > Number(l.received_qty || 0)
+        && !["pending", "rejected"].includes(l.purchase_orders?.approval_status ?? ""));
+    },
+  });
+  const pickPoLine = (id: string) => {
+    if (id === "__none__") { set("po_item_id", ""); return; }
+    const l = (openPoLines ?? []).find((x: any) => x.id === id);
+    setErrors((e) => { const n = { ...e }; delete n.seller_name; delete n.purchase_price; delete n.purchase_currency; return n; });
+    setForm((f) => ({
+      ...f, po_item_id: id,
+      size: (["20", "40", "45"].includes(l?.container_size) ? l.container_size : f.size) as any,
+      category: (l?.container_category ?? f.category) as any,
+      height_class: (l?.container_category ?? "dry") === "dry" ? (l?.container_height === "HC" ? "HC" : "LC") : "",
+    }));
+  };
   const [sellerMode, setSellerMode] = useState<"select" | "other">("select");
   const [ownerMode, setOwnerMode] = useState<"select" | "other">("select");
   const [shippingMode, setShippingMode] = useState<"select" | "other">("select");
@@ -1552,6 +1595,28 @@ function AddContainerDialog({
 
           {form.ownership_type === "depot_owned" && (
             <div className="space-y-3 rounded-md border p-3 bg-muted/30">
+              {!!openPoLines?.length && (
+                <div className="space-y-2">
+                  <Label className="text-xs">Bought on a container purchase order?</Label>
+                  <Select value={form.po_item_id || "__none__"} onValueChange={pickPoLine}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">No — enter the seller and price below</SelectItem>
+                      {openPoLines.map((l: any) => (
+                        <SelectItem key={l.id} value={l.id}>
+                          {l.purchase_orders?.po_number} · {l.purchase_orders?.suppliers?.name} · {l.description} ({Number(l.received_qty || 0)}/{Number(l.quantity)} in)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {form.po_item_id && (
+                    <p className="text-xs text-muted-foreground">
+                      The container is received on that order at the order price. The supplier's invoice and payment are handled on the order.
+                    </p>
+                  )}
+                </div>
+              )}
+              {!form.po_item_id && (<>
               <Label className="text-sm font-semibold">Seller (invoices {depotName})</Label>
               <div className="space-y-2">
                 <Label className="text-xs">Seller *</Label>
@@ -1592,6 +1657,7 @@ function AddContainerDialog({
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">A supplier invoice (PINV) will be issued to the seller and posted to accounts payable.</p>
+              </>)}
             </div>
           )}
 

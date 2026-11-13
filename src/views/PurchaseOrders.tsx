@@ -21,6 +21,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApprovalTimeline } from "@/components/approvals/ApprovalTimeline";
 import PoStatusCell from "@/components/procurement/PoStatusCell";
+import ContainerPurchaseOrdersTab from "@/views/procurement/ContainerPurchaseOrders";
 
 import { Plus, ShoppingBag, PackageCheck, ArrowDownToLine, RotateCcw, Trash2, Package, Pencil, AlertCircle, Eye, Printer } from "lucide-react";
 import { printPurchaseOrder } from "@/lib/document-templates";
@@ -176,6 +177,7 @@ function PurchaseOrdersTab() {
       const { data, error } = await supabase
         .from("purchase_orders")
         .select("*, suppliers(name, contact_person, phone, email, address, currency), container_conversions:conversion_id(conversion_number), po_items(*)")
+        .neq("po_type", "containers")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -937,7 +939,7 @@ function GoodsReceiptsTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("goods_receipts")
-        .select("*, purchase_orders:po_id(po_number, suppliers(name)), supplementary:supplementary_po_id(po_number), credit_note:credit_note_invoice_id(invoice_number), goods_receipt_items(*, po_items(description, material_id, quantity))")
+        .select("*, purchase_orders:po_id(po_number, suppliers(name)), supplementary:supplementary_po_id(po_number), credit_note:credit_note_invoice_id(invoice_number), goods_receipt_items(*, po_items(description, material_id, quantity, container_size))")
         .eq("organization_id", organizationId!)
         .order("received_at", { ascending: false });
       if (error) throw error;
@@ -1000,7 +1002,7 @@ function GoodsReceiptsTab() {
                   <TableCell className="text-sm">
                     {r.goods_receipt_items?.map((gi: any) => {
                       const variance = Number(gi.received_qty) - Number(gi.ordered_qty ?? gi.po_items?.quantity ?? 0);
-                      const unlinked = !gi.po_items?.material_id;
+                      const unlinked = !gi.po_items?.material_id && !gi.po_items?.container_size;
                       return (
                         <div key={gi.id} className="text-xs flex items-center gap-1 flex-wrap">
                           <span className="truncate max-w-[180px]">{gi.po_items?.description}</span>
@@ -1395,12 +1397,12 @@ function UnpostedReceiptsBanner({ onGoToReceipts }: { onGoToReceipts: () => void
     queryFn: async () => {
       const { data, error } = await supabase
         .from("goods_receipts")
-        .select("id, is_void, goods_receipt_items(id, po_items(material_id))")
+        .select("id, is_void, goods_receipt_items(id, po_items(material_id, container_size))")
         .eq("organization_id", organizationId!)
         .eq("is_void", false);
       if (error) throw error;
       return (data as any[]).reduce(
-        (n, r) => n + (r.goods_receipt_items ?? []).filter((gi: any) => !gi.po_items?.material_id).length,
+        (n, r) => n + (r.goods_receipt_items ?? []).filter((gi: any) => !gi.po_items?.material_id && !gi.po_items?.container_size).length,
         0,
       );
     },
@@ -1418,13 +1420,21 @@ function UnpostedReceiptsBanner({ onGoToReceipts }: { onGoToReceipts: () => void
 }
 
 export default function PurchaseOrders() {
-  const [tab, setTab] = useState("pos");
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(searchParams.get("tab") === "containers" ? "containers" : "pos");
+  // an approval or notification link (?open=<po id>) to a container PO opens that tab
+  const openId = searchParams.get("open");
+  useEffect(() => {
+    if (!openId) return;
+    supabase.from("purchase_orders").select("po_type").eq("id", openId).maybeSingle()
+      .then(({ data }) => { if ((data as any)?.po_type === "containers") setTab("containers"); });
+  }, [openId]);
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2"><ShoppingBag className="h-6 w-6" />Procurement & Store</h1>
-          <p className="text-muted-foreground">Purchase orders, goods receipts, store issues & returns</p>
+          <p className="text-muted-foreground">Purchase orders for materials and containers, goods receipts, store issues & returns</p>
         </div>
         <Button variant="outline" asChild>
           <a href="/materials"><Package className="mr-1 h-4 w-4" />Materials & Stock</a>
@@ -1434,11 +1444,13 @@ export default function PurchaseOrders() {
       <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList>
           <TabsTrigger value="pos">Purchase Orders</TabsTrigger>
+          <TabsTrigger value="containers">Container POs</TabsTrigger>
           <TabsTrigger value="receipts">Goods Receipts</TabsTrigger>
           <TabsTrigger value="issues">Store Issues</TabsTrigger>
           <TabsTrigger value="returns">Store Returns</TabsTrigger>
         </TabsList>
         <TabsContent value="pos"><PurchaseOrdersTab /></TabsContent>
+        <TabsContent value="containers"><ContainerPurchaseOrdersTab /></TabsContent>
         <TabsContent value="receipts"><GoodsReceiptsTab /></TabsContent>
         <TabsContent value="issues"><StoreIssuesTab /></TabsContent>
         <TabsContent value="returns"><StoreReturnsTab /></TabsContent>

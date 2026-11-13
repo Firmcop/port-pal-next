@@ -53,7 +53,11 @@ function nextAction(status: string): { to: string; label: string; icon: typeof S
 
 const CANCELLABLE = ["draft", "sent", "confirmed"];
 
-export default function PoStatusCell({ poId, status }: { poId: string; status: string }) {
+export default function PoStatusCell({ poId, status, allowPrepay = false }: {
+  poId: string; status: string;
+  /** container POs: the supplier may be paid once the order is confirmed, before delivery */
+  allowPrepay?: boolean;
+}) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const org = useOrganization();
@@ -133,7 +137,7 @@ export default function PoStatusCell({ poId, status }: { poId: string; status: s
         </Button>
       )}
 
-      {(status === "received" || status === "partially_received") && (
+      {(status === "received" || status === "partially_received" || (allowPrepay && status === "confirmed")) && (
         <Button
           size="sm"
           variant="ghost"
