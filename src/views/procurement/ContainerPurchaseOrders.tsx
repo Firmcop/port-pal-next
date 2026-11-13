@@ -34,7 +34,8 @@ const fmtDate = (d?: string | null) => (d ? format(new Date(d), "dd MMM yyyy") :
 
 interface Line {
   container_size: string;
-  container_height: "" | "HC";
+  /** HC or LC for dry containers; blank for other types */
+  container_height: "" | "HC" | "LC";
   container_category: string;
   container_grade: string;
   quantity: string;
@@ -235,7 +236,8 @@ function EditDialog({ poId, existing, onClose, onSaved }: { poId: string | null;
   const [lines, setLines] = useState<Line[]>(
     existing?.po_items?.length
       ? existing.po_items.map((i: any) => ({
-          container_size: i.container_size ?? "40", container_height: i.container_height === "HC" ? "HC" : "",
+          container_size: i.container_size ?? "40",
+          container_height: (i.container_category ?? "dry") !== "dry" ? "" : i.container_height === "HC" ? "HC" : "LC",
           container_category: i.container_category ?? "dry", container_grade: i.container_grade ?? "B",
           quantity: String(Number(i.quantity) || 1), unit_price: String(i.unit_price ?? ""),
         }))
@@ -255,7 +257,12 @@ function EditDialog({ poId, existing, onClose, onSaved }: { poId: string | null;
   const currency = existing?.currency ?? supplier?.currency ?? getDefaultCurrency();
   const total = lines.reduce((s, l) => s + (Number(l.quantity) || 0) * (Number(l.unit_price) || 0), 0);
 
-  const set = (i: number, k: keyof Line, v: string) => setLines((p) => p.map((l, idx) => (idx === i ? { ...l, [k]: v } : l)));
+  const set = (i: number, k: keyof Line, v: string) => setLines((p) => p.map((l, idx) => {
+    if (idx !== i) return l;
+    const next = { ...l, [k]: v } as Line;
+    if (k === "container_category") next.container_height = v === "dry" ? (l.container_height || "HC") : "";
+    return next;
+  }));
 
   const save = useMutation({
     mutationFn: async () => {
@@ -265,6 +272,7 @@ function EditDialog({ poId, existing, onClose, onSaved }: { poId: string | null;
       lines.forEach((l, i) => {
         if (!(Number.isInteger(Number(l.quantity)) && Number(l.quantity) > 0)) throw new Error(`Line ${i + 1}: enter how many containers`);
         if (!(Number(l.unit_price) > 0)) throw new Error(`Line ${i + 1}: enter the price per container`);
+        if (l.container_category === "dry" && !l.container_height) throw new Error(`Line ${i + 1}: pick HC or LC`);
       });
       const header = {
         supplier_id: supplierId,
@@ -361,9 +369,14 @@ function EditDialog({ poId, existing, onClose, onSaved }: { poId: string | null;
               </div>
               <div className="col-span-3 sm:col-span-2 space-y-1">
                 <Label className="text-xs">Height</Label>
-                <Select value={l.container_height || "std"} onValueChange={(v) => set(i, "container_height", v === "HC" ? "HC" : "")}>
+                <Select value={l.container_height || "none"} disabled={l.container_category !== "dry"}
+                        onValueChange={(v) => set(i, "container_height", v === "none" ? "" : v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="std">Standard</SelectItem><SelectItem value="HC">High cube</SelectItem></SelectContent>
+                  <SelectContent>
+                    {l.container_category !== "dry" && <SelectItem value="none">—</SelectItem>}
+                    <SelectItem value="HC">HC (high cube)</SelectItem>
+                    <SelectItem value="LC">LC (standard)</SelectItem>
+                  </SelectContent>
                 </Select>
               </div>
               <div className="col-span-3 sm:col-span-2 space-y-1">
@@ -416,6 +429,8 @@ function ReceiveDialog({ po, onClose, onSaved }: { po: any; onClose: () => void;
   const lines = (po?.po_items ?? []).map((i: any) => ({
     id: i.id, description: i.description, quantity: Number(i.quantity) || 0, received_qty: Number(i.received_qty) || 0,
     container_grade: i.container_grade,
+    container_category: i.container_category ?? "dry",
+    container_height: i.container_height,
   }));
   const [rows, setRows] = useState<ReceiveUnit[]>(() =>
     rowsForOutstanding(lines, { received_at: today(), depot_id: getWorkingDepotId() ?? null }).map((r) => ({
@@ -485,7 +500,8 @@ function ReceiveDialog({ po, onClose, onSaved }: { po: any; onClose: () => void;
           <Button size="sm" variant="ghost" onClick={() => setShowTransport((v) => !v)}>
             <Truck className="mr-1 h-3 w-3" />{showTransport ? "Hide" : "Show"} transport and crane details
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setRows((p) => [...p, { po_item_id: lines[0]?.id ?? "", container_number: "", delivery: "yard", received_at: today(), depot_id: getWorkingDepotId() ?? null }])}>
+          <Button size="sm" variant="outline" onClick={() => setRows((p) => [...p, { po_item_id: lines[0]?.id ?? "", container_number: "", delivery: "yard", received_at: today(), depot_id: getWorkingDepotId() ?? null,
+              height_class: (lines[0]?.container_category ?? "dry") === "dry" ? (lines[0]?.container_height === "HC" ? "HC" : "LC") : null }])}>
             <Plus className="mr-1 h-3 w-3" />Add row
           </Button>
         </div>
@@ -494,9 +510,15 @@ function ReceiveDialog({ po, onClose, onSaved }: { po: any; onClose: () => void;
           {rows.map((r, i) => (
             <div key={i} className="rounded-md border p-2 space-y-2">
               <div className="grid grid-cols-12 gap-2 items-start">
-                <div className="col-span-12 sm:col-span-3 space-y-1">
+                <div className="col-span-12 sm:col-span-2 space-y-1">
                   <Label className="text-xs">Line</Label>
-                  <Select value={r.po_item_id || undefined} onValueChange={(v) => set(i, "po_item_id", v)}>
+                  <Select value={r.po_item_id || undefined} onValueChange={(v) => {
+                    const l = lines.find((x: any) => x.id === v);
+                    setRows((p) => p.map((row, idx) => idx === i ? {
+                      ...row, po_item_id: v,
+                      height_class: (l?.container_category ?? "dry") === "dry" ? (l?.container_height === "HC" ? "HC" : "LC") : null,
+                    } : row));
+                  }}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Line" /></SelectTrigger>
                     <SelectContent>{lines.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.description} ({l.received_qty}/{l.quantity})</SelectItem>)}</SelectContent>
                   </Select>
@@ -513,6 +535,16 @@ function ReceiveDialog({ po, onClose, onSaved }: { po: any; onClose: () => void;
                   <Input className="h-8" type="date" value={r.received_at ?? ""} max={today()} onChange={(e) => set(i, "received_at", e.target.value)} />
                 </div>
                 <div className="col-span-6 sm:col-span-1 space-y-1">
+                  <Label className="text-xs">Height</Label>
+                  {(lines.find((l: any) => l.id === r.po_item_id)?.container_category ?? "dry") === "dry" ? (
+                    <Select value={r.height_class ?? undefined} onValueChange={(v) => set(i, "height_class", v)}>
+                      <SelectTrigger className="h-8"><SelectValue placeholder="HC/LC" /></SelectTrigger>
+                      <SelectContent><SelectItem value="HC">HC</SelectItem><SelectItem value="LC">LC</SelectItem></SelectContent>
+                    </Select>
+                  ) : <div className="h-8 flex items-center text-xs text-muted-foreground">—</div>}
+                  <FieldMsg issue={issueFor(i, "height_class")} />
+                </div>
+                <div className="col-span-6 sm:col-span-1 space-y-1">
                   <Label className="text-xs">Grade</Label>
                   <Select value={r.grade ?? "none"} onValueChange={(v) => set(i, "grade", v === "none" ? null : v)}>
                     <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
@@ -522,7 +554,7 @@ function ReceiveDialog({ po, onClose, onSaved }: { po: any; onClose: () => void;
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="col-span-6 sm:col-span-2 space-y-1">
+                <div className="col-span-6 sm:col-span-1 space-y-1">
                   <Label className="text-xs">Goes to</Label>
                   <Select value={r.delivery} onValueChange={(v) => set(i, "delivery", v)}>
                     <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>

@@ -31,7 +31,8 @@ export interface ContainerLineSpec {
 /** "40ft HC dry · grade B" — the PO line description. */
 export function describeContainerLine(l: ContainerLineSpec): string {
   const size = l.container_size ? `${l.container_size}ft` : "Container";
-  const height = l.container_height === "HC" ? " HC" : "";
+  const dry = (l.container_category || "dry") === "dry";
+  const height = dry && (l.container_height === "HC" || l.container_height === "LC") ? ` ${l.container_height}` : "";
   const type = CONTAINER_TYPES.find((t) => t.value === (l.container_category || "dry"))?.label.toLowerCase() ?? "dry";
   const grade = l.container_grade
     ? l.container_grade === "as_is" ? " · as is" : ` · grade ${l.container_grade}`
@@ -76,6 +77,8 @@ export interface ReceiveUnit {
   container_number: string;
   received_at?: string;
   delivery: "yard" | "direct";
+  /** HC or LC; required for dry containers */
+  height_class?: "HC" | "LC" | null;
   customer_id?: string | null;
   grade?: string | null;
   depot_id?: string | null;
@@ -95,6 +98,8 @@ export interface OutstandingLine {
   description: string;
   quantity: number;
   received_qty: number;
+  container_category?: string | null;
+  container_height?: string | null;
 }
 
 export interface UnitIssue {
@@ -123,6 +128,9 @@ export function checkReceiveUnits(units: ReceiveUnit[], lines: OutstandingLine[]
     }
     if (!u.po_item_id) issues.push({ row: i, field: "po_item_id", message: "Pick the order line" });
     else perLine.set(u.po_item_id, (perLine.get(u.po_item_id) ?? 0) + 1);
+    const line = lines.find((x) => x.id === u.po_item_id);
+    if (line && (line.container_category || "dry") === "dry" && u.height_class !== "HC" && u.height_class !== "LC")
+      issues.push({ row: i, field: "height_class", message: "Pick HC or LC" });
     if (u.delivery === "direct" && !u.customer_id) issues.push({ row: i, field: "customer_id", message: "Pick the customer" });
     if (Number(u.transport_cost || 0) > 0 && !String(u.transport_vendor ?? "").trim())
       issues.push({ row: i, field: "transport_vendor", message: "Who did the transport?" });
@@ -147,7 +155,11 @@ export function rowsForOutstanding(lines: OutstandingLine[], defaults: Partial<R
   for (const l of lines) {
     const left = Math.max(Number(l.quantity) - Number(l.received_qty || 0), 0);
     for (let k = 0; k < left && rows.length < max; k++) {
-      rows.push({ delivery: "yard", ...defaults, po_item_id: l.id, container_number: "" });
+      const dry = (l.container_category || "dry") === "dry";
+      rows.push({
+        delivery: "yard", ...defaults, po_item_id: l.id, container_number: "",
+        height_class: dry ? (l.container_height === "HC" ? "HC" : "LC") : null,
+      });
     }
   }
   return rows;

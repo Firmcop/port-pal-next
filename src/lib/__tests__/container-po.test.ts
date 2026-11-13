@@ -7,6 +7,7 @@ describe("container PO lines", () => {
   it("describes a line", () => {
     expect(describeContainerLine({ container_size: "40", container_height: "HC", container_category: "dry", container_grade: "B" }))
       .toBe("40ft HC dry container · grade B");
+    expect(describeContainerLine({ container_size: "40", container_height: "LC", container_category: "dry" })).toBe("40ft LC dry container");
     expect(describeContainerLine({ container_size: "20", container_category: "reefer", container_grade: "as_is" }))
       .toBe("20ft reefer container · as is");
     expect(describeContainerLine({ container_size: "20" })).toBe("20ft dry container");
@@ -27,14 +28,15 @@ describe("container numbers", () => {
 
 describe("receive form", () => {
   const lines = [
-    { id: "L1", description: "40ft HC dry container", quantity: 3, received_qty: 1 },
+    { id: "L1", description: "40ft HC dry container", quantity: 3, received_qty: 1, container_height: "HC" },
     { id: "L2", description: "20ft dry container", quantity: 1, received_qty: 0 },
   ];
 
   it("makes one row per container still to come", () => {
     const rows = rowsForOutstanding(lines, { received_at: "2026-11-13" });
     expect(rows.map((r) => r.po_item_id)).toEqual(["L1", "L1", "L2"]);
-    expect(rows[0]).toMatchObject({ delivery: "yard", received_at: "2026-11-13", container_number: "" });
+    expect(rows.map((r) => r.height_class)).toEqual(["HC", "HC", "LC"]);
+    expect(rows[0]).toMatchObject({ delivery: "yard", received_at: "2026-11-13", container_number: "", height_class: "HC" });
   });
 
   it("flags missing and repeated numbers, too many on a line and a direct delivery with no customer", () => {
@@ -48,13 +50,18 @@ describe("receive form", () => {
   });
 
   it("only warns on an unusual or mistyped number", () => {
-    const issues = checkReceiveUnits([{ po_item_id: "L1", container_number: "CSQU3054384", delivery: "yard" }], lines);
+    const issues = checkReceiveUnits([{ po_item_id: "L1", container_number: "CSQU3054384", delivery: "yard", height_class: "HC" }], lines);
     expect(issues).toHaveLength(1);
     expect(issues[0].warning).toBe(true);
   });
 
+  it("needs HC or LC for a dry container", () => {
+    const issues = checkReceiveUnits([{ po_item_id: "L1", container_number: "CSQU3054383", delivery: "yard" }], lines);
+    expect(issues.map((i) => i.field)).toEqual(["height_class"]);
+  });
+
   it("needs a vendor when a transport cost is entered", () => {
-    const issues = checkReceiveUnits([{ po_item_id: "L1", container_number: "CSQU3054383", delivery: "yard", transport_cost: 15000 }], lines);
+    const issues = checkReceiveUnits([{ po_item_id: "L1", container_number: "CSQU3054383", delivery: "yard", height_class: "HC", transport_cost: 15000 }], lines);
     expect(issues.map((i) => i.field)).toEqual(["transport_vendor"]);
   });
 });
