@@ -13,6 +13,11 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Layers, Hammer, ShoppingCart, ListTree, Trash2, FileText, Scale, Lock, Unlock, Pencil, RotateCcw } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { ImageIcon, Upload } from "lucide-react";
+import {
+  setSubAssemblyImage, setSubAssemblyImageKind, removeSubAssemblyImage, signSaImages, checkSaImage,
+  SA_IMAGE_TYPES, SA_IMAGE_KIND_LABEL, type SaImageKind,
+} from "@/lib/subAssemblyImages";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -56,20 +61,26 @@ export default function SubAssemblyStock() {
   const [open, setOpen] = useState(false);
   const [f, setF] = useState({ assembly_type: "door", name: "", uom: "pcs", reorder_point: "0", default_sale_price: "", project_id: NONE });
   const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
+  const [newImage, setNewImage] = useState<File | null>(null);
+  const [newImageKind, setNewImageKind] = useState<SaImageKind>("actual");
 
   const createMut = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("sub_assembly_stock" as any).insert({
+      const { data: created, error } = await (supabase as any).from("sub_assembly_stock").insert({
         assembly_type: f.assembly_type,
         name: f.name,
         uom: f.uom,
         reorder_point: parseFloat(f.reorder_point) || 0,
         default_sale_price: f.default_sale_price ? parseFloat(f.default_sale_price) : null,
         project_id: f.project_id === NONE ? null : f.project_id,
-      });
+      }).select("id, organization_id").single();
       if (error) throw error;
+      if (newImage) {
+        try { await setSubAssemblyImage(created, newImage, newImageKind); }
+        catch (e: any) { toast({ title: "SKU created, but the image did not upload", description: e.message, variant: "destructive" }); }
+      }
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["sub-assembly-stock"] }); toast({ title: "SKU created" }); setOpen(false); setF({ assembly_type: "door", name: "", uom: "pcs", reorder_point: "0", default_sale_price: "", project_id: NONE }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["sub-assembly-stock"] }); toast({ title: "SKU created" }); setOpen(false); setNewImage(null); setNewImageKind("actual"); setF({ assembly_type: "door", name: "", uom: "pcs", reorder_point: "0", default_sale_price: "", project_id: NONE }); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -91,14 +102,33 @@ export default function SubAssemblyStock() {
     },
   });
 
+  const { data: canEdit = false } = useQuery({
+    queryKey: ["can-edit-sub-assemblies"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("can_edit_sub_assemblies");
+      if (error) return false;
+      return !!data;
+    },
+  });
+  const imagePaths = items.map((it: any) => it.image_path).filter(Boolean) as string[];
+  const { data: imageUrls = {} } = useQuery({
+    queryKey: ["sa-image-urls", imagePaths.join("|")],
+    enabled: imagePaths.length > 0,
+    staleTime: 50 * 60 * 1000,
+    queryFn: () => signSaImages(imagePaths),
+  });
+  const [imageFor, setImageFor] = useState<any>(null);
+
   const archivedCount = items.filter((it: any) => it.archived_at).length;
   const visible = items.filter((it: any) => showArchived || !it.archived_at);
   const refresh = () => qc.invalidateQueries({ queryKey: ["sub-assembly-stock"] });
 
   const deleteMut = useMutation({
     mutationFn: async (id: string) => {
+      const imagePath = items.find((x: any) => x.id === id)?.image_path as string | undefined;
       const { data, error } = await (supabase as any).rpc("delete_sub_assembly", { _id: id });
       if (error) throw error;
+      if (data === "deleted" && imagePath) await supabase.storage.from("sub-assembly-images").remove([imagePath]);
       return data as string;
     },
     onSuccess: (res) => {
@@ -153,6 +183,21 @@ export default function SubAssemblyStock() {
                 </Select>
                 <p className="text-xs text-muted-foreground">Used as the default project for builds of this SKU.</p>
               </div>
+              <div className="space-y-2">
+                <Label>Image (optional)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="file" accept={SA_IMAGE_TYPES.join(",")}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null;
+                      const problem = file ? checkSaImage(file) : null;
+                      if (problem) { toast({ title: "Image not accepted", description: problem, variant: "destructive" }); e.target.value = ""; setNewImage(null); return; }
+                      setNewImage(file);
+                    }}
+                  />
+                  <KindSelect value={newImageKind} onChange={setNewImageKind} />
+                </div>
+              </div>
 
               <Button type="submit" className="w-full" disabled={createMut.isPending || !f.name}>Create</Button>
             </form>
@@ -203,11 +248,26 @@ export default function SubAssemblyStock() {
                       <TableRow key={it.id} className={archived ? "opacity-60" : undefined}>
                         <TableCell className="capitalize">{it.assembly_type?.replace("_"," ")}</TableCell>
                         <TableCell className="font-medium">
-                          <div className="flex items-center gap-1.5">
-                            {it.is_locked && <Lock className="h-3.5 w-3.5 text-amber-600 shrink-0" aria-label="Locked" />}
-                            <span>{it.name}</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setImageFor(it)}
+                              className="h-10 w-10 shrink-0 rounded border bg-muted/40 overflow-hidden flex items-center justify-center hover:ring-2 hover:ring-ring"
+                              title={it.image_path ? `View ${SA_IMAGE_KIND_LABEL[(it.image_kind ?? "actual") as SaImageKind].toLowerCase()}` : (canEdit && !frozen ? "Add an image" : "No image")}
+                            >
+                              {it.image_path && imageUrls[it.image_path]
+                                ? <img src={imageUrls[it.image_path]} alt="" className="h-full w-full object-cover" />
+                                : <ImageIcon className="h-4 w-4 text-muted-foreground" />}
+                            </button>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                {it.is_locked && <Lock className="h-3.5 w-3.5 text-amber-600 shrink-0" aria-label="Locked" />}
+                                <span>{it.name}</span>
+                                {it.image_kind === "design" && <Badge variant="outline" className="text-[10px] px-1 py-0">Design</Badge>}
+                              </div>
+                              {it.is_locked && it.lock_reason && <div className="text-xs text-muted-foreground font-normal">{it.lock_reason}</div>}
+                            </div>
                           </div>
-                          {it.is_locked && it.lock_reason && <div className="text-xs text-muted-foreground font-normal">{it.lock_reason}</div>}
                         </TableCell>
                         <TableCell>
                           <Select
@@ -274,6 +334,14 @@ export default function SubAssemblyStock() {
         <TabsContent value="sales"><SalesTab /></TabsContent>
       </Tabs>
 
+      {imageFor && (
+        <ImageDialog
+          sku={items.find((x: any) => x.id === imageFor.id) ?? imageFor}
+          url={imageUrls[(items.find((x: any) => x.id === imageFor.id) ?? imageFor).image_path ?? ""]}
+          canChange={canEdit && !imageFor.is_locked && !imageFor.archived_at}
+          onClose={() => setImageFor(null)}
+        />
+      )}
       {editFor && <EditDialog sku={editFor} projects={projects} onClose={() => setEditFor(null)} />}
       {lockFor && <LockDialog sku={lockFor} onClose={() => setLockFor(null)} />}
       <AlertDialog open={!!deleteFor} onOpenChange={(v) => !v && setDeleteFor(null)}>
@@ -560,6 +628,81 @@ function BomDialog({ sku, locked = false, onClose }: { sku: any; locked?: boolea
           </Card>
         </div>
 
+        <DialogFooter><Button variant="outline" onClick={onClose}>Close</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ─────────── Image ─────────── */
+function KindSelect({ value, onChange }: { value: SaImageKind; onChange: (v: SaImageKind) => void }) {
+  return (
+    <Select value={value} onValueChange={(v) => onChange(v as SaImageKind)}>
+      <SelectTrigger className="w-[150px] shrink-0"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="actual">{SA_IMAGE_KIND_LABEL.actual}</SelectItem>
+        <SelectItem value="design">{SA_IMAGE_KIND_LABEL.design}</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+}
+
+function ImageDialog({ sku, url, canChange, onClose }: { sku: any; url?: string; canChange: boolean; onClose: () => void }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [kind, setKind] = useState<SaImageKind>((sku.image_kind ?? "actual") as SaImageKind);
+  const refresh = () => { qc.invalidateQueries({ queryKey: ["sub-assembly-stock"] }); };
+
+  const run = async (fn: () => Promise<void>, done: string) => {
+    setBusy(true);
+    try { await fn(); refresh(); toast({ title: done }); }
+    catch (e: any) { toast({ title: "Error", description: e.message, variant: "destructive" }); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ImageIcon className="h-4 w-4" />{sku.name}
+            {sku.image_path && <Badge variant="outline">{SA_IMAGE_KIND_LABEL[(sku.image_kind ?? "actual") as SaImageKind]}</Badge>}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="rounded border bg-muted/30 min-h-[200px] flex items-center justify-center overflow-hidden">
+          {sku.image_path && url
+            ? <img src={url} alt={sku.name} className="max-h-[60vh] w-auto object-contain" />
+            : <p className="text-sm text-muted-foreground py-12">{sku.image_path ? "Loading image…" : "No image yet"}</p>}
+        </div>
+        {canChange ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <KindSelect
+              value={kind}
+              onChange={(v) => { setKind(v); if (sku.image_path) run(() => setSubAssemblyImageKind(sku, v), "Updated"); }}
+            />
+            <Button asChild variant="outline" disabled={busy}>
+              <label className="cursor-pointer">
+                <Upload className="h-4 w-4 mr-1" />{sku.image_path ? "Replace image" : "Upload image"}
+                <input
+                  type="file" accept={SA_IMAGE_TYPES.join(",")} className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]; e.target.value = "";
+                    if (file) run(() => setSubAssemblyImage(sku, file, kind), "Image saved");
+                  }}
+                />
+              </label>
+            </Button>
+            {sku.image_path && (
+              <Button variant="ghost" className="text-destructive" disabled={busy} onClick={() => run(() => removeSubAssemblyImage(sku), "Image removed")}>
+                <Trash2 className="h-4 w-4 mr-1" />Remove
+              </Button>
+            )}
+            <span className="text-xs text-muted-foreground ml-auto">JPG, PNG, WebP or HEIC, up to 5 MB</span>
+          </div>
+        ) : sku.is_locked ? (
+          <p className="text-xs text-muted-foreground flex items-center gap-1"><Lock className="h-3 w-3" />Locked — an admin must unlock it to change the image.</p>
+        ) : null}
         <DialogFooter><Button variant="outline" onClick={onClose}>Close</Button></DialogFooter>
       </DialogContent>
     </Dialog>
