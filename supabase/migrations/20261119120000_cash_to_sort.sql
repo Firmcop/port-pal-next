@@ -35,9 +35,10 @@ CREATE TABLE IF NOT EXISTS public.cash_sort_actions (
 );
 CREATE INDEX IF NOT EXISTS cash_sort_actions_line_idx ON public.cash_sort_actions (ledger_line_id);
 ALTER TABLE public.cash_sort_actions ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS cash_sort_actions_select ON public.cash_sort_actions;
-CREATE POLICY cash_sort_actions_select ON public.cash_sort_actions FOR SELECT TO authenticated
-  USING (organization_id = public.current_org_id() OR public.is_platform_admin());
+DO $$ BEGIN
+  CREATE POLICY cash_sort_actions_select ON public.cash_sort_actions FOR SELECT TO authenticated
+    USING (organization_id = public.current_org_id() OR public.is_platform_admin());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 GRANT SELECT ON public.cash_sort_actions TO authenticated;
 GRANT ALL ON public.cash_sort_actions TO service_role;
 
@@ -234,6 +235,5 @@ BEGIN
   END IF;
   RETURN NEW;
 END $$;
-DROP TRIGGER IF EXISTS trg_require_payment_account ON public.vendor_payments;
-CREATE TRIGGER trg_require_payment_account BEFORE INSERT ON public.vendor_payments
+CREATE OR REPLACE TRIGGER trg_require_payment_account BEFORE INSERT ON public.vendor_payments
   FOR EACH ROW EXECUTE FUNCTION public.require_payment_account();
