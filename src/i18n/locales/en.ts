@@ -97,6 +97,7 @@ export default {
     cashflow_forecast: "Cash Flow Forecast",
     fx_revaluation: "FX Revaluation",
     fixed_assets: "Fixed Assets",
+    cash_to_sort: "Cash to sort",
     operating_expenses: "Operating Expenses",
     loans: "Loans & Facilities",
     commitments: "Commitments",

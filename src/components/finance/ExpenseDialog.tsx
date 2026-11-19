@@ -174,9 +174,18 @@ export function ExpenseDialog({
     return { sub, tax, total: sub + tax };
   }, [lines, taxCodes]);
 
+  // direct job costs (5xxx: materials, labour, container cost) must name the job,
+  // so the job, its project and the P&L carry the same figure
+  const directCost = lines.some((l) => {
+    const a = (glAccounts ?? []).find((g: any) => g.id === l.gl_account_id);
+    return !!a && String(a.code).startsWith("5") && Number(l.amount) > 0;
+  });
+  const needsJob = directCost && !conversionId;
+
   const valid =
     lines.some((l) => l.gl_account_id && Number(l.amount) > 0) &&
     (mode === "credit" || !!accountId) &&
+    !needsJob &&
     (!requireProject || !!projectId || lines.every((l) => !l.gl_account_id || !!l.project_id));
 
   const reset = () => {
@@ -385,8 +394,10 @@ export function ExpenseDialog({
                 if (job?.project_id) setProjectId(job.project_id);
               }}
             />
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Tag the job so this cost shows on the job's budget as a direct expense.
+            <p className={`mt-1 text-[11px] ${needsJob ? "text-destructive" : "text-muted-foreground"}`}>
+              {needsJob
+                ? "This is a direct job cost (materials, labour or container) — pick the job it was for."
+                : "Tag the job so this cost shows on the job, its project and the P&L."}
             </p>
           </div>
           <div><Label>Reference</Label><Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Receipt / invoice no." /></div>

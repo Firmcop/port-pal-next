@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { getDefaultCurrency, fmtMoney } from "@/lib/finance-format";
 import { WorkTasksPanel } from "@/components/work-tasks/WorkTasksPanel";
+import { JobBooksCard } from "@/components/conversions/JobBooksCard";
 import { useParams, useNavigate, Link } from "@/lib/router";
 import { useConversionCostSync, isDrifted } from "@/hooks/use-conversion-cost-sync";
 import { resyncConversionContainerCosts, type ResyncPreviewRow } from "@/lib/conversion-cost-sync";
@@ -456,6 +457,7 @@ export default function ConversionDetail() {
       </div>
 
       {/* Tabs */}
+      <JobBooksCard conversionId={id!} />
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="flex flex-wrap">
           <TabsTrigger value="overview">Overview</TabsTrigger>

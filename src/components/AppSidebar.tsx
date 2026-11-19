@@ -6,7 +6,7 @@ import { ScanSearch, Gauge,
   KeyRound, ListChecks, PlayCircle, Wallet, FolderKanban, PiggyBank, Search, BadgeDollarSign, DollarSign,
   BookText, Scale, TrendingUp, CalendarRange, Clock, Repeat, AlarmClock, FileSpreadsheet, Percent, FileCheck2, Waves, Globe, Target,
   Building, ReceiptText, Coins, Shield, Lock, History, Boxes, PackageMinus, PackageOpen,
-  ShieldAlert, Landmark,
+  ShieldAlert, Landmark, Inbox,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/lib/auth";
@@ -118,6 +118,7 @@ export const billingItems: Item[] = [
   { key: "bank_cash_accounts", url: "/finance/accounts", icon: Wallet, module: "accounting" },
   { key: "inter_account_transfers", url: "/finance/transfers", icon: ArrowLeftRight, module: "accounting" },
   { key: "bank_reconciliations", url: "/finance/reconciliations", icon: ClipboardCheck, module: "accounting" },
+  { key: "cash_to_sort", url: "/finance/cash-to-sort", icon: Inbox, module: "accounting" },
   { key: "projects", url: "/finance/projects", icon: FolderKanban, module: ["accounting", "manufacturing"] },
   { key: "tax_codes", url: "/finance/tax-codes", icon: Percent, module: "accounting" },
   { key: "tax_returns", url: "/finance/tax-returns", icon: FileText, module: "accounting" },
