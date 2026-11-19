@@ -165,6 +165,7 @@ export default function QuoteDetail() {
       const { data, error } = await supabase
         .from("sub_assembly_stock")
         .select("id, name, assembly_type, uom, avg_unit_cost")
+        .is("archived_at" as any, null)
         .order("name");
       if (error) throw error;
       return data;

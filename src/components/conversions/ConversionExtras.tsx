@@ -1259,7 +1259,7 @@ export function SubAssembliesTab({ conversionId, onChanged, jobRef }: { conversi
   const { data: stock = [] } = useQuery({
     queryKey: ["sub-assembly-stock-min"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("sub_assembly_stock" as any).select("*").order("name");
+      const { data, error } = await supabase.from("sub_assembly_stock" as any).select("*").is("archived_at", null).order("name");
       if (error) throw error;
       return data as any[];
     },

@@ -11,7 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Layers, Hammer, ShoppingCart, ListTree, Trash2, FileText, Scale } from "lucide-react";
+import { Plus, Layers, Hammer, ShoppingCart, ListTree, Trash2, FileText, Scale, Lock, Unlock, Pencil, RotateCcw } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { StockAdjustmentDialog } from "@/components/inventory/StockAdjustmentDialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -72,6 +77,45 @@ export default function SubAssemblyStock() {
   const [bomFor, setBomFor] = useState<any>(null);
   const [buildFor, setBuildFor] = useState<any>(null);
   const [sellFor, setSellFor] = useState<any>(null);
+  const [editFor, setEditFor] = useState<any>(null);
+  const [lockFor, setLockFor] = useState<any>(null);
+  const [deleteFor, setDeleteFor] = useState<any>(null);
+  const [showArchived, setShowArchived] = useState(false);
+
+  const { data: isAdmin = false } = useQuery({
+    queryKey: ["is-org-admin"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).rpc("is_org_admin");
+      if (error) return false;
+      return !!data;
+    },
+  });
+
+  const archivedCount = items.filter((it: any) => it.archived_at).length;
+  const visible = items.filter((it: any) => showArchived || !it.archived_at);
+  const refresh = () => qc.invalidateQueries({ queryKey: ["sub-assembly-stock"] });
+
+  const deleteMut = useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await (supabase as any).rpc("delete_sub_assembly", { _id: id });
+      if (error) throw error;
+      return data as string;
+    },
+    onSuccess: (res) => {
+      refresh();
+      toast(res === "archived"
+        ? { title: "Archived", description: "It has history, so it was archived instead of deleted. Turn on “Show archived” to restore it." }
+        : { title: "Deleted" });
+      setDeleteFor(null);
+    },
+    onError: (e: any) => { toast({ title: "Could not delete", description: e.message, variant: "destructive" }); setDeleteFor(null); },
+  });
+
+  const restore = async (id: string) => {
+    const { error } = await (supabase as any).rpc("restore_sub_assembly", { _id: id });
+    if (error) return toast({ title: "Error", description: error.message, variant: "destructive" });
+    toast({ title: "Restored" }); refresh();
+  };
 
   return (
     <div className="space-y-6">
@@ -123,6 +167,12 @@ export default function SubAssemblyStock() {
         </TabsList>
 
         <TabsContent value="stock" className="space-y-4">
+          {archivedCount > 0 && (
+            <div className="flex items-center justify-end gap-2 text-sm">
+              <Switch id="sa-show-archived" checked={showArchived} onCheckedChange={setShowArchived} />
+              <Label htmlFor="sa-show-archived">Show archived ({archivedCount})</Label>
+            </div>
+          )}
           <Card>
             <CardContent className="p-0">
               <Table>
@@ -143,16 +193,25 @@ export default function SubAssemblyStock() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>
-                  ) : !items.length ? (
+                  ) : !visible.length ? (
                     <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">No SKUs yet</TableCell></TableRow>
-                  ) : items.map((it: any) => {
+                  ) : visible.map((it: any) => {
                     const low = Number(it.on_hand_qty) <= Number(it.reorder_point);
+                    const archived = !!it.archived_at;
+                    const frozen = !!it.is_locked || archived;
                     return (
-                      <TableRow key={it.id}>
+                      <TableRow key={it.id} className={archived ? "opacity-60" : undefined}>
                         <TableCell className="capitalize">{it.assembly_type?.replace("_"," ")}</TableCell>
-                        <TableCell className="font-medium">{it.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-1.5">
+                            {it.is_locked && <Lock className="h-3.5 w-3.5 text-amber-600 shrink-0" aria-label="Locked" />}
+                            <span>{it.name}</span>
+                          </div>
+                          {it.is_locked && it.lock_reason && <div className="text-xs text-muted-foreground font-normal">{it.lock_reason}</div>}
+                        </TableCell>
                         <TableCell>
                           <Select
+                            disabled={frozen}
                             value={it.project_id ?? NONE}
                             onValueChange={async (v) => {
                               const { error } = await (supabase as any).from("sub_assembly_stock")
@@ -174,13 +233,33 @@ export default function SubAssemblyStock() {
                         <TableCell className="text-right font-mono">{fmt(it.bom_unit_cost)}</TableCell>
                         <TableCell className="text-right font-mono">{fmt(it.avg_unit_cost)}</TableCell>
                         <TableCell className="text-right font-mono">{it.default_sale_price != null ? fmt(it.default_sale_price) : "—"}</TableCell>
-                        <TableCell>{low ? <Badge variant="destructive">Low</Badge> : <Badge variant="secondary">OK</Badge>}</TableCell>
+                        <TableCell>
+                          {archived ? <Badge variant="outline">Archived</Badge>
+                            : low ? <Badge variant="destructive">Low</Badge> : <Badge variant="secondary">OK</Badge>}
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-1 justify-end">
-                            <Button size="sm" variant="outline" onClick={() => setBomFor(it)}><ListTree className="h-3 w-3 mr-1" />BOM</Button>
-                            <Button size="sm" variant="outline" onClick={() => setBuildFor(it)}><Hammer className="h-3 w-3 mr-1" />Build</Button>
-                            <Button size="sm" variant="outline" onClick={() => setAdjustFor(it)}><Scale className="h-3 w-3 mr-1" />Adjust</Button>
-                            <Button size="sm" onClick={() => setSellFor(it)} disabled={Number(it.on_hand_qty) <= 0}><ShoppingCart className="h-3 w-3 mr-1" />Sell</Button>
+                            {archived ? (
+                              isAdmin && <Button size="sm" variant="outline" onClick={() => restore(it.id)}><RotateCcw className="h-3 w-3 mr-1" />Restore</Button>
+                            ) : (
+                              <>
+                                <Button size="sm" variant="outline" onClick={() => setBomFor(it)}><ListTree className="h-3 w-3 mr-1" />BOM</Button>
+                                <Button size="sm" variant="outline" onClick={() => setBuildFor(it)}><Hammer className="h-3 w-3 mr-1" />Build</Button>
+                                <Button size="sm" variant="outline" onClick={() => setAdjustFor(it)}><Scale className="h-3 w-3 mr-1" />Adjust</Button>
+                                <Button size="sm" onClick={() => setSellFor(it)} disabled={Number(it.on_hand_qty) <= 0}><ShoppingCart className="h-3 w-3 mr-1" />Sell</Button>
+                                {isAdmin && (
+                                  <>
+                                    <Button size="sm" variant="ghost" title={it.is_locked ? "Unlock to edit" : "Edit"} disabled={!!it.is_locked} onClick={() => setEditFor(it)}><Pencil className="h-3.5 w-3.5" /></Button>
+                                    <Button size="sm" variant="ghost" title={it.is_locked ? "Unlock" : "Lock"} onClick={() => setLockFor(it)}>
+                                      {it.is_locked ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
+                                    </Button>
+                                    <Button size="sm" variant="ghost" title={it.is_locked ? "Unlock to delete" : "Delete"} disabled={!!it.is_locked} onClick={() => setDeleteFor(it)}>
+                                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                    </Button>
+                                  </>
+                                )}
+                              </>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -195,7 +274,29 @@ export default function SubAssemblyStock() {
         <TabsContent value="sales"><SalesTab /></TabsContent>
       </Tabs>
 
-      {bomFor && <BomDialog sku={bomFor} onClose={() => setBomFor(null)} />}
+      {editFor && <EditDialog sku={editFor} projects={projects} onClose={() => setEditFor(null)} />}
+      {lockFor && <LockDialog sku={lockFor} onClose={() => setLockFor(null)} />}
+      <AlertDialog open={!!deleteFor} onOpenChange={(v) => !v && setDeleteFor(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{deleteFor?.name}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              If this SKU has never been built, adjusted, sold or used on a job, it and its BOM are deleted for good.
+              If it has history, it is archived instead: hidden from the list and blocked from new builds and sales, but kept for the records.
+              Stock on hand must be zero first.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMut.isPending}
+              onClick={(e) => { e.preventDefault(); if (deleteFor) deleteMut.mutate(deleteFor.id); }}
+            >Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {bomFor && <BomDialog sku={bomFor} locked={!!bomFor.is_locked} onClose={() => setBomFor(null)} />}
       {buildFor && <BuildDialog sku={buildFor} onClose={() => setBuildFor(null)} />}
       {sellFor && <SellDialog sku={sellFor} onClose={() => setSellFor(null)} />}
       {adjustFor && (
@@ -214,7 +315,7 @@ export default function SubAssemblyStock() {
 }
 
 /* ─────────── BOM Dialog ─────────── */
-function BomDialog({ sku, onClose }: { sku: any; onClose: () => void }) {
+function BomDialog({ sku, locked = false, onClose }: { sku: any; locked?: boolean; onClose: () => void }) {
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -322,7 +423,14 @@ function BomDialog({ sku, onClose }: { sku: any; onClose: () => void }) {
           <DialogTitle className="flex items-center gap-2"><ListTree className="h-4 w-4" />BOM — {sku.name}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5">
+        {locked && (
+          <div className="flex items-center gap-2 rounded border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-2 text-sm">
+            <Lock className="h-4 w-4 text-amber-600" />
+            This BOM is locked{sku.lock_reason ? ` — ${sku.lock_reason}` : ""}. An admin must unlock it before it can be changed.
+          </div>
+        )}
+
+        <div className={locked ? "space-y-5 [&_.bom-edit]:hidden" : "space-y-5"}>
           {/* Materials */}
           <section>
             <h3 className="font-semibold mb-2">Materials</h3>
@@ -340,11 +448,11 @@ function BomDialog({ sku, onClose }: { sku: any; onClose: () => void }) {
                       <TableCell className="text-right font-mono">{m.qty_per_unit}</TableCell>
                       <TableCell className="text-right font-mono">{fmt(c)}</TableCell>
                       <TableCell className="text-right font-mono">{fmt(c * Number(m.qty_per_unit))}</TableCell>
-                      <TableCell className="text-right"><Button size="sm" variant="ghost" onClick={() => del("sub_assembly_bom_materials", m.id)}><Trash2 className="h-3 w-3" /></Button></TableCell>
+                      <TableCell className="text-right"><Button size="sm" variant="ghost" className="bom-edit" onClick={() => del("sub_assembly_bom_materials", m.id)}><Trash2 className="h-3 w-3" /></Button></TableCell>
                     </TableRow>
                   );
                 })}
-                <TableRow>
+                <TableRow className="bom-edit">
                   <TableCell>
                     <Select value={newMat.material_id} onValueChange={(v) => setNewMat({ ...newMat, material_id: v })}>
                       <SelectTrigger><SelectValue placeholder="Pick material" /></SelectTrigger>
@@ -377,10 +485,10 @@ function BomDialog({ sku, onClose }: { sku: any; onClose: () => void }) {
                     <TableCell className="text-right font-mono">{l.hours_per_unit}</TableCell>
                     <TableCell className="text-right font-mono">{fmt(l.rate_per_hour)}</TableCell>
                     <TableCell className="text-right font-mono">{fmt(Number(l.hours_per_unit) * Number(l.rate_per_hour))}</TableCell>
-                    <TableCell className="text-right"><Button size="sm" variant="ghost" onClick={() => del("sub_assembly_bom_labor", l.id)}><Trash2 className="h-3 w-3" /></Button></TableCell>
+                    <TableCell className="text-right"><Button size="sm" variant="ghost" className="bom-edit" onClick={() => del("sub_assembly_bom_labor", l.id)}><Trash2 className="h-3 w-3" /></Button></TableCell>
                   </TableRow>
                 ))}
-                <TableRow>
+                <TableRow className="bom-edit">
                   <TableCell className="space-y-1 min-w-[220px]">
                     <Select
                       value={newLab.employee_id || "none"}
@@ -426,10 +534,10 @@ function BomDialog({ sku, onClose }: { sku: any; onClose: () => void }) {
                   <TableRow key={o.id}>
                     <TableCell>{o.description}</TableCell>
                     <TableCell className="text-right font-mono">{fmt(o.cost_per_unit)}</TableCell>
-                    <TableCell className="text-right"><Button size="sm" variant="ghost" onClick={() => del("sub_assembly_bom_overheads", o.id)}><Trash2 className="h-3 w-3" /></Button></TableCell>
+                    <TableCell className="text-right"><Button size="sm" variant="ghost" className="bom-edit" onClick={() => del("sub_assembly_bom_overheads", o.id)}><Trash2 className="h-3 w-3" /></Button></TableCell>
                   </TableRow>
                 ))}
-                <TableRow>
+                <TableRow className="bom-edit">
                   <TableCell><Input placeholder="e.g. consumables" value={newOvh.description} onChange={(e) => setNewOvh({ ...newOvh, description: e.target.value })} /></TableCell>
                   <TableCell><Input type="number" step="0.01" value={newOvh.cost_per_unit} onChange={(e) => setNewOvh({ ...newOvh, cost_per_unit: e.target.value })} /></TableCell>
                   <TableCell className="text-right"><Button size="sm" onClick={addOvh}><Plus className="h-3 w-3" /></Button></TableCell>
@@ -453,6 +561,125 @@ function BomDialog({ sku, onClose }: { sku: any; onClose: () => void }) {
         </div>
 
         <DialogFooter><Button variant="outline" onClick={onClose}>Close</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ─────────── Edit Dialog (admin) ─────────── */
+function EditDialog({ sku, projects, onClose }: { sku: any; projects: any[]; onClose: () => void }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [f, setF] = useState({
+    name: sku.name ?? "",
+    assembly_type: sku.assembly_type ?? "other",
+    uom: sku.uom ?? "pcs",
+    reorder_point: String(sku.reorder_point ?? 0),
+    default_sale_price: sku.default_sale_price != null ? String(sku.default_sale_price) : "",
+    project_id: sku.project_id ?? NONE,
+    notes: sku.notes ?? "",
+  });
+  const set = (k: string, v: string) => setF((p) => ({ ...p, [k]: v }));
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await (supabase as any).rpc("update_sub_assembly", {
+        _id: sku.id,
+        _name: f.name,
+        _assembly_type: f.assembly_type,
+        _uom: f.uom,
+        _reorder_point: parseFloat(f.reorder_point) || 0,
+        _default_sale_price: f.default_sale_price === "" ? null : parseFloat(f.default_sale_price),
+        _project_id: f.project_id === NONE ? null : f.project_id,
+        _notes: f.notes,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["sub-assembly-stock"] }); toast({ title: "Saved" }); onClose(); },
+    onError: (e: any) => toast({ title: "Could not save", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader><DialogTitle className="flex items-center gap-2"><Pencil className="h-4 w-4" />Edit — {sku.name}</DialogTitle></DialogHeader>
+        <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-3">
+          <div className="space-y-2">
+            <Label>Assembly Type</Label>
+            <Select value={f.assembly_type} onValueChange={(v) => set("assembly_type", v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{TYPES.map((t) => <SelectItem key={t} value={t} className="capitalize">{t.replace("_"," ")}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2"><Label>Name</Label><Input value={f.name} onChange={(e) => set("name", e.target.value)} required /></div>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-2"><Label>UoM</Label><Input value={f.uom} onChange={(e) => set("uom", e.target.value)} /></div>
+            <div className="space-y-2"><Label>Reorder Pt</Label><Input type="number" value={f.reorder_point} onChange={(e) => set("reorder_point", e.target.value)} /></div>
+            <div className="space-y-2"><Label>Sale Price</Label><Input type="number" value={f.default_sale_price} onChange={(e) => set("default_sale_price", e.target.value)} placeholder="optional" /></div>
+          </div>
+          <div className="space-y-2">
+            <Label>Project</Label>
+            <Select value={f.project_id} onValueChange={(v) => set("project_id", v)}>
+              <SelectTrigger><SelectValue placeholder="No project" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>No project</SelectItem>
+                {projects.map((p: any) => <SelectItem key={p.id} value={p.id}>{p.code} — {p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2"><Label>Notes</Label><Textarea value={f.notes} onChange={(e) => set("notes", e.target.value)} className="h-16" /></div>
+          <p className="text-xs text-muted-foreground">Changing the unit of measure does not convert stock already on hand.</p>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={save.isPending || !f.name.trim()}>Save</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ─────────── Lock / Unlock Dialog (admin) ─────────── */
+function LockDialog({ sku, onClose }: { sku: any; onClose: () => void }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const locking = !sku.is_locked;
+  const [reason, setReason] = useState("");
+
+  const run = useMutation({
+    mutationFn: async () => {
+      const { error } = await (supabase as any).rpc("set_sub_assembly_lock", { _id: sku.id, _locked: locking, _reason: reason || null });
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["sub-assembly-stock"] }); toast({ title: locking ? "Locked" : "Unlocked" }); onClose(); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {locking ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+            {locking ? "Lock" : "Unlock"} — {sku.name}
+          </DialogTitle>
+        </DialogHeader>
+        {locking ? (
+          <div className="space-y-3 text-sm">
+            <p>Locking freezes the name, type, unit, prices, project and BOM, and stops the SKU from being deleted. Builds, stock adjustments and sales carry on as normal.</p>
+            <div className="space-y-2"><Label>Reason (optional)</Label><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. BOM approved for 2026 price list" /></div>
+          </div>
+        ) : (
+          <p className="text-sm">
+            Unlocking lets anyone with manufacturing access change the details and BOM again.
+            {sku.lock_reason ? <> It was locked because: <span className="font-medium">{sku.lock_reason}</span>.</> : null}
+            {sku.locked_at ? <> Locked on {format(new Date(sku.locked_at), "dd MMM yyyy")}.</> : null}
+          </p>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => run.mutate()} disabled={run.isPending}>{locking ? "Lock" : "Unlock"}</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -67,6 +67,7 @@ export function CatalogPicker({
       const { data, error } = await supabase
         .from("sub_assembly_stock")
         .select("id, name, assembly_type, uom, avg_unit_cost, on_hand_qty")
+        .is("archived_at" as any, null)
         .order("name").limit(1000);
       if (error) throw error; return data;
     },
